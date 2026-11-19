@@ -68,7 +68,7 @@ function snapshot(l: Lesson, course: string): string {
 
 const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
-export async function chat(input: { lesson: Lesson; course: string; history: { role: "user" | "assistant"; text: string }[]; message: string }) {
+export async function chat(input: { lesson: Lesson; course: string; history: { role: "user" | "assistant"; text: string }[]; message: string; current?: string | null }) {
   if (!claudeOn()) throw new NoClaude();
   const l = input.lesson;
   const slideIds = new Set(l.slides.map((x) => x.id));
@@ -81,7 +81,12 @@ export async function chat(input: { lesson: Lesson; course: string; history: { r
 
   const messages: Anthropic.Beta.BetaMessageParam[] = [
     ...input.history.slice(-12).map((m) => ({ role: m.role, content: m.text || "…" })),
-    { role: "user", content: `${snapshot(l, input.course)}\n\n---\nTANYA: ${input.message}` },
+    {
+      role: "user",
+      content: `${snapshot(l, input.course)}${
+        input.current && slideIds.has(input.current) ? `\n\nShe is looking at Slide ${pos(input.current)} [id:${input.current}] right now — "this slide" means that one.` : ""
+      }\n\n---\nTANYA: ${input.message}`,
+    },
   ];
   while (messages.length && messages[0].role !== "user") messages.shift();
 

@@ -8,7 +8,14 @@ import type { Course, Lesson } from "./types";
 export const OTHER = "__other";
 
 export function upgrade(l: Lesson): Lesson {
-  return { ...l, courseId: l.courseId || (l.id.startsWith("example-") ? "course-example" : OTHER), premise: l.premise ?? l.summary ?? "", readings: l.readings ?? [], slides: l.slides ?? [] };
+  const deck = (l.materials ?? []).some((m) => m.kind === "pptx");
+  const slides = (l.slides ?? []).map((s) =>
+    s.notes && !s.fromDeck && !deck ? { ...s, body: s.body.trim() ? s.body : s.notes, notes: "" } : s,
+  );
+  return {
+    ...l,
+    slides,
+    courseId: l.courseId || (l.id.startsWith("example-") ? "course-example" : OTHER), premise: l.premise ?? l.summary ?? "", readings: l.readings ?? [] };
 }
 
 export function useStudio() {

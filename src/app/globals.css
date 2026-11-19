@@ -561,3 +561,33 @@ h2 { font-size: 28px; }
 .rich p { margin: 0 0 8px; }
 .rich ul, .rich ol { margin: 0 0 8px; padding-left: 1.2em; }
 .rich li + li { margin-top: 3px; }
+
+/* one slide at a time */
+.focus { max-width: 1000px; }
+.focusnav { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; font-size: 18px; }
+.focusnav .btn { font-size: 26px; line-height: 1; padding: 0 8px; text-decoration: none; }
+.focusnav .select { margin-left: auto; }
+.focusstage { padding: 0; }
+.focusstage.over { outline: 2px solid var(--ink); outline-offset: 4px; }
+.focustools { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; margin-top: 18px; }
+.focusdrawer { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.focusdrawer .dtabs { border: 0; }
+.slidenums { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--line); }
+.slidenums .num { min-width: 40px; padding: 4px 8px; background: none; border: 1px solid var(--line); cursor: pointer; font-family: var(--serif); font-size: 16px; color: var(--ink2); }
+.slidenums .num.on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.slidenums .num.bad { border-color: var(--safelight); }
+.srcs summary { cursor: pointer; font-size: 16px; }
+
+/* one slide at a time, PowerPoint-style: slides on the left, big slide, chat on the right */
+body.slidesfocus .side { display: none; }
+body.slidesfocus .page { max-width: none; padding-left: 28px; }
+.pptwrap { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 26px; align-items: start; }
+.rail { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 6px; }
+.railitem { display: grid; grid-template-columns: 22px 1fr; gap: 6px; align-items: start; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.railitem .slide { pointer-events: none; border: 1px solid var(--line); }
+.railitem.on .slide { outline: 2px solid var(--ink); outline-offset: 2px; }
+.railnum { font-size: 15px; color: var(--mute); padding-top: 2px; }
+.railitem.on .railnum { color: var(--ink); font-weight: 600; }
+.railadd { border: 1px dashed var(--line); background: none; padding: 10px; cursor: pointer; font-family: var(--serif); font-size: 16px; color: var(--mute); margin-left: 28px; }
+.pptmain { min-width: 0; max-width: 1100px; }
+@media (max-width: 860px) { .pptwrap { grid-template-columns: 1fr; } .rail { position: static; flex-direction: row; overflow-x: auto; max-height: none; } .railitem { flex: 0 0 140px; } }

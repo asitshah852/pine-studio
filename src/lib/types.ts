@@ -46,6 +46,7 @@ export type Slide = {
   artworks: Artwork[]; // museum records behind the images (the caption source)
   sources: Source[];
   check?: { at: string; claims: Claim[] };
+  fromDeck?: boolean; // imported from her own PowerPoint (keeps its original notes)
 };
 
 export type Course = { id: string; name: string; example?: boolean };

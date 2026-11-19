@@ -18,7 +18,7 @@ const STARTERS = [
   "Add a slide with a quick in-class activity",
 ];
 
-export default function Talk({ lesson, course, set, close, onActions }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; close: () => void; onActions?: (ops: ChatOp[]) => void }) {
+export default function Talk({ lesson, course, set, close, onActions, shownSlide }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; close: () => void; onActions?: (ops: ChatOp[]) => void; shownSlide?: () => string | null }) {
   const st = useStatus();
   const key = `chat:${lesson.id}`;
   const job = useJob(key);
@@ -39,7 +39,7 @@ export default function Talk({ lesson, course, set, close, onActions }: { lesson
     const { chat: _c, versions: _v, materials: _m, review: _r, ...slim } = lesson;
     job.clearError();
     await job.run(async () => {
-      const r = await apiJob<{ reply: string; sources: Source[]; ops: ChatOp[] }>("/api/chat", { lesson: slim, course, history, message: m, jobKey: key });
+      const r = await apiJob<{ reply: string; sources: Source[]; ops: ChatOp[] }>("/api/chat", { lesson: slim, course, history, message: m, current: shownSlide?.() ?? null, jobKey: key });
       set((l) => withChat(l, user, r));
       forget(key);
       onActions?.(r.ops);

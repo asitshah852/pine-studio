@@ -102,6 +102,7 @@ export async function importPptx(file: File, onProgress?: (s: string) => void): 
       images,
       artworks: [],
       sources: [],
+      fromDeck: true,
     });
   }
   return { slides, text: all.map((t, i) => `--- Slide ${i + 1} ---\n${t}`).join("\n\n") };

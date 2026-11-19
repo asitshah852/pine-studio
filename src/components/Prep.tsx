@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, proxied, uid, useCollection, useStatus } from "@/lib/client";
+import { load, proxied, save, uid, useCollection, useStatus } from "@/lib/client";
 import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
 import { recover, runJob, useJob } from "@/lib/jobs";
@@ -261,6 +261,19 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
   const st = useStatus();
   const [sel, setSel] = useState<string | null>(initial ?? null);
   const [more, setMore] = useState(false);
+  const [focus, setFocusState] = useState(true);
+  const [tools, setTools] = useState(false); // the "add an exhibit" panel in focus view
+  useEffect(() => setFocusState(load<boolean>("pine.focus", true)), []);
+  const [menu, setMenu] = useState(false);
+  useEffect(() => {
+    document.body.classList.toggle("slidesfocus", focus && !menu);
+    window.dispatchEvent(new CustomEvent("pine:focus-view", { detail: focus }));
+    return () => document.body.classList.remove("slidesfocus");
+  }, [focus, menu]);
+  const setFocus = (v: boolean) => {
+    setFocusState(v);
+    save("pine.focus", v);
+  };
   useEffect(() => {
     if (initial) setSel(initial);
   }, [initial]);
@@ -289,7 +302,8 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
   const chosen = [...(lesson.research?.exhibits ?? []), ...(lesson.review?.exhibits ?? [])]
     .filter((e) => e.use && e.match)
     .map((e) => e.match!)
-    .filter((a, i, all) => all.findIndex((b) => b.url === a.url) === i);
+    .filter((a, i, all) => all.findIndex((b) => b.url === a.url) === i)
+    .filter((a) => !lesson.slides.some((sl) => sl.artworks.some((w) => w.url === a.url)));
   const books = resources.filter((r) => r.kind === "textbook");
 
   async function auto() {
@@ -322,6 +336,10 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
     setSlides((ss) => { const n = [...ss]; n.splice(at ?? n.length, 0, s); return n; });
     setSel(s.id);
   }
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("pine:slide-selected", { detail: slide?.id ?? null }));
+  }, [slide?.id]);
+
   // ← / → move between slides (when not typing).
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -378,57 +396,8 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
       </div>
     );
 
-  return (
+  const toolsPanel = (
     <>
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 14 }}>
-        {maker}
-        <span className="mono mute">{lesson.slides.length} slides</span>
-      </div>
-      {checkJob.error && <div className="err" style={{ marginBottom: 12 }}>Fact-check: {checkJob.error}</div>}
-      {busy && <Working since={job.started} what="Remaking slides" doing="Turning the research document into slides with talking points, speaker notes and your exhibits" usual="1–2 minutes" />}
-      {err && <div className="err" style={{ marginBottom: 12 }}>{err}</div>}
-      <div className="bench slides">
-        {slide && (
-          <section className={`stage ${over === "stage" ? "over" : ""}`} onDragOver={(e) => { if (e.dataTransfer.types.includes(MIME)) { e.preventDefault(); setOver("stage"); } }} onDragLeave={() => setOver(null)}
-            onDrop={(e) => { e.preventDefault(); setOver(null); const it = readDrag(e); if (it) setSlide(slide.id, (s) => addTo(s, it)); }}>
-            <div className="row" style={{ marginBottom: 10, justifyContent: "space-between" }}>
-              <span className="mono mute">slide {pad(lesson.slides.indexOf(slide) + 1)} of {lesson.slides.length} · click the title to edit · ← → to move</span>
-              <span className="row" style={{ gap: 12 }}>
-                <span className={`v ${stateMark[slideState(slide)]}`}>{checkJob.running && !slide.check ? "checking…" : stateText[slideState(slide)]}</span>
-                <select className="select" style={{ width: "auto" }} value={slide.layout} onChange={(e) => edit({ layout: e.target.value as Slide["layout"] })} aria-label="Layout">
-                  <option value="title">title</option><option value="text">text</option><option value="artwork">one work</option><option value="compare">compare two</option>
-                </select>
-              </span>
-            </div>
-            <SlideView
-              s={slide}
-              n={lesson.number}
-              edit={{
-                onTitle: (t) => edit({ title: t }),
-                onRemoveImage: (i) => setSlide(slide.id, (x) => ({ ...x, images: x.images.filter((_, j) => j !== i), artworks: x.artworks.filter((a) => caption(a) !== x.images[i]?.credit), check: undefined })),
-              }}
-            />
-            <div className="stack" style={{ marginTop: 14 }}>
-              <div>
-                <label className="label mono">talking points — a few bullets, one per line{slide.artworks.length ? ", linking the research to this work" : ""}</label>
-                <textarea className="area" rows={5} value={slide.body} onChange={(e) => edit({ body: e.target.value })} />
-                <div className="mute" style={{ fontSize: 16, marginTop: 4 }}>{slide.layout === "text" ? "Shown on the slide and in your presenter notes." : slide.layout === "title" ? "Shown under the title." : "In your presenter notes; the slide shows just the work and its caption."}</div>
-              </div>
-              {slide.notes && (
-                <div><label className="label mono">notes from your deck</label><textarea className="area" rows={3} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })} /></div>
-              )}
-              {slide.check && slide.check.claims.length > 0 && (
-                <Claims claims={slide.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, slide.id, ci, ok))} onUseFix={(ci) => takeFix(slide.id, ci)} />
-              )}
-              <Src sources={slide.sources} />
-              <div className="row">
-                <button className="btn sm ghost" onClick={() => { const c = { ...slide, id: uid(), check: undefined }; setSlides((x) => { const i = x.findIndex((y) => y.id === slide.id); const n = [...x]; n.splice(i + 1, 0, c); return n; }); setSel(c.id); }}>Duplicate</button>
-                <button className="btn sm ghost" onClick={() => { if (confirm("Delete this slide?")) { setSlides((x) => x.filter((y) => y.id !== slide.id)); setSel(null); } }}>Delete slide</button>
-              </div>
-            </div>
-          </section>
-        )}
-        <aside className="drawer">
           <div className="dtabs" role="tablist">
             {(more ? (["exhibits", "textbook", "images", "library"] as const) : (["exhibits"] as const)).map((t) => (
               <button key={t} role="tab" className="dtab mono" aria-selected={tool === t} onClick={() => setTool(t)}>{t === "images" ? "my images" : t}</button>
@@ -460,6 +429,134 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
               <LibraryPanel lesson={lesson} resources={resources} toggle={(id) => set((l) => ({ ...l, readings: l.readings.includes(id) ? l.readings.filter((x) => x !== id) : [...l.readings, id] }))} />
             </div>
           </div>
+    </>
+  );
+  const idx = slide ? lesson.slides.indexOf(slide) : -1;
+  const go = (d: number) => lesson.slides[idx + d] && setSel(lesson.slides[idx + d].id);
+  const stageDrop = {
+    onDragOver: (e: React.DragEvent) => { if (e.dataTransfer.types.includes(MIME)) { e.preventDefault(); setOver("stage"); } },
+    onDragLeave: () => setOver(null),
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); setOver(null); const it = readDrag(e); if (it && slide) setSlide(slide.id, (x) => addTo(x, it)); },
+  };
+  const editorBody = slide ? (
+    <>
+            <SlideView
+              s={slide}
+              n={lesson.number}
+              edit={{
+                onTitle: (t) => edit({ title: t }),
+                onRemoveImage: (i) => setSlide(slide.id, (x) => ({ ...x, images: x.images.filter((_, j) => j !== i), artworks: x.artworks.filter((a) => caption(a) !== x.images[i]?.credit), check: undefined })),
+              }}
+            />
+            <div className="stack" style={{ marginTop: 14 }}>
+              <div>
+                <label className="label mono">talking points — a few bullets, one per line{slide.artworks.length ? ", linking the research to this work" : ""}</label>
+                <textarea className="area" rows={5} value={slide.body} onChange={(e) => edit({ body: e.target.value })} />
+                <div className="mute" style={{ fontSize: 16, marginTop: 4 }}>{slide.layout === "text" ? "Shown on the slide and in your presenter notes." : slide.layout === "title" ? "Shown under the title." : "In your presenter notes; the slide shows just the work and its caption."}</div>
+              </div>
+              {slide.notes && (
+                <div><label className="label mono">notes from your deck</label><textarea className="area" rows={3} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })} /></div>
+              )}
+              {slide.check && slide.check.claims.length > 0 && (
+                <Claims claims={slide.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, slide.id, ci, ok))} onUseFix={(ci) => takeFix(slide.id, ci)} />
+              )}
+              {slide.sources.length > 0 && (
+                <details className="srcs">
+                  <summary className="mute">sources ({slide.sources.length})</summary>
+                  <Src sources={slide.sources} />
+                </details>
+              )}
+              <div className="row">
+                <button className="btn sm ghost" onClick={() => { const c = { ...slide, id: uid(), check: undefined }; setSlides((x) => { const i = x.findIndex((y) => y.id === slide.id); const n = [...x]; n.splice(i + 1, 0, c); return n; }); setSel(c.id); }}>Duplicate</button>
+                <button className="btn sm ghost" onClick={() => { if (confirm("Delete this slide?")) { setSlides((x) => x.filter((y) => y.id !== slide.id)); setSel(null); } }}>Delete slide</button>
+              </div>
+            </div>
+    </>
+  ) : null;
+
+  // One slide at a time (default): big slide, its talking points, ‹ › and slide numbers.
+  if (focus)
+    return (
+      <>
+        <div className="row" style={{ justifyContent: "space-between", marginBottom: 14 }}>
+          {maker}
+          <button className="btn ghost" onClick={() => setFocus(false)}>show all slides</button>
+        </div>
+        {checkJob.error && <div className="err" style={{ marginBottom: 12 }}>Fact-check: {checkJob.error}</div>}
+        {busy && <Working since={job.started} what="Remaking slides" doing="Turning the research document into slides with talking points and your exhibits" usual="1–2 minutes" />}
+        {err && <div className="err" style={{ marginBottom: 12 }}>{err}</div>}
+        {slide && (
+          <div className="pptwrap">
+            <nav className="rail" aria-label="Slides" onDragOver={(e) => e.preventDefault()} onDrop={(e) => dropOnStrip(e)}>
+              {lesson.slides.map((x, i) => (
+                <button
+                  key={x.id}
+                  className={`railitem ${x.id === slide.id ? "on" : ""}`}
+                  onClick={() => setSel(x.id)}
+                  draggable
+                  onDragStart={(e) => { e.dataTransfer.setData(FRAME, x.id); e.dataTransfer.effectAllowed = "move"; }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.stopPropagation(); dropOnStrip(e, i); }}
+                  title={x.title}
+                >
+                  <span className="railnum">{i + 1}{slideState(x) === "problem" ? " ✗" : ""}</span>
+                  <SlideView s={x} n={lesson.number} />
+                </button>
+              ))}
+              <button className="railadd" onClick={() => { const n = blankSlide("text"); setSlides((x) => { const i = x.findIndex((y) => y.id === slide.id); const c = [...x]; c.splice(i + 1, 0, n); return c; }); setSel(n.id); }} title="Add a slide after this one">+ slide</button>
+            </nav>
+            <div className="pptmain">
+              <div className="focusnav">
+                <button className="linkish" onClick={() => setMenu(!menu)}>{menu ? "hide menu" : "‹ menu"}</button>
+                <button className="btn" disabled={idx <= 0} onClick={() => go(-1)} aria-label="Previous slide">‹</button>
+                <span>slide {idx + 1} of {lesson.slides.length}</span>
+                <button className="btn" disabled={idx >= lesson.slides.length - 1} onClick={() => go(1)} aria-label="Next slide">›</button>
+                <span className={`v ${stateMark[slideState(slide)]}`}>{checkJob.running && !slide.check ? "checking…" : stateText[slideState(slide)]}</span>
+                <select className="select" style={{ width: "auto" }} value={slide.layout} onChange={(e) => edit({ layout: e.target.value as Slide["layout"] })} aria-label="Layout">
+                  <option value="title">title</option><option value="text">text</option><option value="artwork">one work</option><option value="compare">compare two</option>
+                </select>
+              </div>
+              <section className={`focusstage ${over === "stage" ? "over" : ""}`} {...stageDrop}>
+                {editorBody}
+              </section>
+              <div className="focustools">
+                <button className="btn" onClick={() => setTools(!tools)}>{tools ? "close exhibits" : "+ add an exhibit"}</button>
+                <span className="mute">or use the chat: “simplify this slide”, “find a better picture for this”</span>
+              </div>
+              {tools && <div className="focusdrawer">{toolsPanel}</div>}
+            </div>
+          </div>
+        )}
+      </>
+    );
+
+  return (
+    <>
+      <div className="row" style={{ justifyContent: "space-between", marginBottom: 14 }}>
+        {maker}
+        <span className="row"><span className="mono mute">{lesson.slides.length} slides</span><button className="btn ghost" onClick={() => setFocus(true)}>one slide at a time</button></span>
+      </div>
+      {checkJob.error && <div className="err" style={{ marginBottom: 12 }}>Fact-check: {checkJob.error}</div>}
+      {busy && <Working since={job.started} what="Remaking slides" doing="Turning the research document into slides with talking points, speaker notes and your exhibits" usual="1–2 minutes" />}
+      {err && <div className="err" style={{ marginBottom: 12 }}>{err}</div>}
+      <div className="bench slides">
+        {slide && (
+          <section className={`stage ${over === "stage" ? "over" : ""}`} onDragOver={(e) => { if (e.dataTransfer.types.includes(MIME)) { e.preventDefault(); setOver("stage"); } }} onDragLeave={() => setOver(null)}
+            onDrop={(e) => { e.preventDefault(); setOver(null); const it = readDrag(e); if (it) setSlide(slide.id, (s) => addTo(s, it)); }}>
+            <div className="row" style={{ marginBottom: 10, justifyContent: "space-between" }}>
+              <span className="mono mute">slide {pad(lesson.slides.indexOf(slide) + 1)} of {lesson.slides.length} · click the title to edit · ← → to move</span>
+              <span className="row" style={{ gap: 12 }}>
+                <span className={`v ${stateMark[slideState(slide)]}`}>{checkJob.running && !slide.check ? "checking…" : stateText[slideState(slide)]}</span>
+                <select className="select" style={{ width: "auto" }} value={slide.layout} onChange={(e) => edit({ layout: e.target.value as Slide["layout"] })} aria-label="Layout">
+                  <option value="title">title</option><option value="text">text</option><option value="artwork">one work</option><option value="compare">compare two</option>
+                </select>
+              </span>
+            </div>
+            {editorBody}
+          </section>
+        )}
+        <aside className="drawer">
+          {toolsPanel}
         </aside>
       </div>
 
@@ -588,6 +685,23 @@ export default function Prep() {
   const [step, setStep] = useState<Step>(1);
   const [creating, setCreating] = useState(false);
   const [talk, setTalk] = useState(false);
+  const shownSlide = useRef<string | null>(null);
+  const autoTalk = useRef(false);
+  useEffect(() => {
+    const f = (e: Event) => {
+      if ((e as CustomEvent<boolean>).detail && !autoTalk.current && window.innerWidth >= 1200) {
+        autoTalk.current = true;
+        setTalk(true);
+      }
+    };
+    window.addEventListener("pine:focus-view", f);
+    return () => window.removeEventListener("pine:focus-view", f);
+  }, []);
+  useEffect(() => {
+    const f = (e: Event) => { shownSlide.current = (e as CustomEvent<string | null>).detail; };
+    window.addEventListener("pine:slide-selected", f);
+    return () => window.removeEventListener("pine:slide-selected", f);
+  }, []);
   const makeJob = useJob(`make:${lessonId ?? "new"}`);
   const history = useRef<Lesson[]>([]);
   const lastPush = useRef(0);
@@ -771,12 +885,12 @@ export default function Prep() {
         <Working since={makeJob.started} what={makeJob.stage ? `Making your class — ${makeJob.stage}` : "Making your class"} doing="Researching, building slides with exhibits, then fact-checking. You can look around or work in another tab" usual="5–8 minutes" />
       )}
       {lesson && makeJob.error && <div className="err" style={{ marginBottom: 14 }}>{makeJob.error}</div>}
-      {step === 1 && <Brief key={lesson?.id ?? `new-${params.get("course") ?? ""}`} lesson={lesson} preset={params.get("course")} onSave={(b) => saveBrief(b)} onMake={(b) => { const l = saveBrief(b, 2); make(l); }} />}
+      {step === 1 && <Brief key={`brief-${lesson?.id ?? `new-${params.get("course") ?? ""}`}`} lesson={lesson} preset={params.get("course")} onSave={(b) => saveBrief(b)} onMake={(b) => { const l = saveBrief(b, 2); make(l); }} />}
       {lesson && step === 2 && (lesson.slides.length > 0 || (lesson.materials?.length ?? 0) > 0 || lesson.review) && (
-        <Improve key={lesson.id} lesson={lesson} course={course} set={set} autoRun={params.get("improve") === "1"} />
+        <Improve key={`improve-${lesson.id}`} lesson={lesson} course={course} set={set} autoRun={params.get("improve") === "1"} />
       )}
       {lesson && step === 2 && <ResearchStep lesson={lesson} course={course} set={set} onNext={() => setStep(3)} />}
-      {lesson && step === 3 && <SlidesStep key={lesson.id} lesson={lesson} course={course} set={set} resources={resources} initial={params.get("slide")} />}
+      {lesson && step === 3 && <SlidesStep key={`slides-${lesson.id}`} lesson={lesson} course={course} set={set} resources={resources} initial={params.get("slide")} />}
       {lesson && step === 4 && <FinishStep lesson={lesson} course={course} set={set} />}
 
       {lesson && (
@@ -786,7 +900,7 @@ export default function Prep() {
         </div>
       )}
       {lesson && !talk && <button className="talk-open btn solid" onClick={() => setTalk(true)}>talk it through</button>}
-      {lesson && talk && <Talk key={lesson.id} lesson={lesson} course={course} set={set} close={() => setTalk(false)} onActions={onActions} />}
+      {lesson && talk && <Talk key={`talk-${lesson.id}`} lesson={lesson} course={course} set={set} close={() => setTalk(false)} onActions={onActions} shownSlide={() => (step === 3 ? shownSlide.current : null)} />}
 
       {lesson && step === 1 && (
         <p className="mute" style={{ fontSize: 16, marginTop: 14 }}>
