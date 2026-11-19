@@ -114,3 +114,22 @@ export function confirmClaim(l: Lesson, slideId: string, index: number, ok: bool
     ),
   };
 }
+
+/** Swap a fact-check's suggested wording into the slide, if the claim's exact words are on it. */
+export function applyFix(l: Lesson, slideId: string, index: number): Lesson | null {
+  const s = l.slides.find((x) => x.id === slideId);
+  const c = s?.check?.claims[index];
+  if (!s || !c?.fix) return null;
+  const norm = (t: string) => t.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+  const want = norm(c.text).trim().replace(/[.]$/, "");
+  for (const field of ["body", "title", "notes"] as const) {
+    const text = norm(s[field]);
+    const at = text.toLowerCase().indexOf(want.toLowerCase());
+    if (at >= 0) {
+      const fix = c.fix.replace(/^suggested wording:\s*/i, "").replace(/^["'“]|["'”]$/g, "");
+      const next = s[field].slice(0, at) + fix + s[field].slice(at + want.length);
+      return { ...l, slides: l.slides.map((x) => (x.id === slideId ? { ...x, [field]: next, check: undefined } : x)) };
+    }
+  }
+  return null;
+}

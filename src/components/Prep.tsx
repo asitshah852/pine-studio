@@ -8,7 +8,7 @@ import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
 import { recover, runJob, useJob } from "@/lib/jobs";
 import { makeClass, runCheck, runResearch, runSlides, slideCount } from "@/lib/make";
-import { confirmClaim, restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
+import { applyFix, confirmClaim, restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
 import { caption } from "@/lib/museum";
 import { downloadPptx } from "@/lib/pptx";
 import { addTo, blankSlide, checkItems, readiness, slideFrom, slideState } from "@/lib/slides";
@@ -270,6 +270,11 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
     return () => window.removeEventListener("pine:goto-slide", go);
   }, []);
   const checkJob = useJob(`check:${lesson.id}`);
+  const takeFix = (slideId: string, i: number) => {
+    const next = applyFix(lesson, slideId, i);
+    if (next) set(() => next);
+    return !!next;
+  };
   const [tool, setTool] = useState<"exhibits" | "textbook" | "images" | "library">("exhibits");
   const [q, setQ] = useState("");
   const [over, setOver] = useState<string | null>(null);
@@ -412,8 +417,8 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
               {slide.notes && (
                 <div><label className="label mono">notes from your deck</label><textarea className="area" rows={3} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })} /></div>
               )}
-              {slide.check && slide.check.claims.some((c) => c.verdict !== "supported" || c.confirmed) && (
-                <Claims claims={slide.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, slide.id, ci, ok))} />
+              {slide.check && slide.check.claims.length > 0 && (
+                <Claims claims={slide.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, slide.id, ci, ok))} onUseFix={(ci) => takeFix(slide.id, ci)} />
               )}
               <Src sources={slide.sources} />
               <div className="row">
@@ -489,6 +494,11 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
   const [pptx, setPptx] = useState(false);
   const [err, setErr] = useState("");
   const r = readiness(lesson);
+  const takeFix = (slideId: string, i: number) => {
+    const next = applyFix(lesson, slideId, i);
+    if (next) set(() => next);
+    return !!next;
+  };
   const nums = (pred: (st: ReturnType<typeof slideState>) => boolean) => lesson.slides.map((x, i) => (pred(slideState(x)) ? i + 1 : 0)).filter(Boolean);
   const uncheckedNums = nums((x) => x === "unchecked");
   const problemNums = nums((x) => x === "problem");
@@ -526,7 +536,7 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
                   <b>{pad(i + 1)} · {s.title || "Untitled"}</b>
                   <span className={`v ${stateMark[state]}`}>{stateText[state]}</span>
                 </div>
-                {s.check ? (s.check.claims.length ? <Claims claims={s.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, s.id, ci, ok))} /> : <p className="mute" style={{ margin: "4px 0 0" }}>No checkable facts.</p>) : <p className="mute" style={{ margin: "4px 0 0" }}>Not checked since the last change.</p>}
+                {s.check ? (s.check.claims.length ? <Claims claims={s.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, s.id, ci, ok))} onUseFix={(ci) => takeFix(s.id, ci)} /> : <p className="mute" style={{ margin: "4px 0 0" }}>No checkable facts.</p>) : <p className="mute" style={{ margin: "4px 0 0" }}>Not checked since the last change.</p>}
               </div>
             </div>
           );

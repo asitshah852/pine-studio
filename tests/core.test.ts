@@ -208,3 +208,13 @@ test("research picks the textbook pages that match the topic", async () => {
   assert.ok(top.some((p) => p.page === 3));
   assert.ok(!top.some((p) => p.page === 1));
 });
+
+test("'use this wording' swaps the suggested fix into the slide and re-checks it", async () => {
+  const { applyFix } = await import("../src/lib/lessonOps");
+  const sl = { ...blankSlide("text", "TOTP"), body: "Before MTV, it was the only regular place fans could see chart acts\nAnother point", check: { at: "t", claims: [{ text: "it was the only regular place fans could see chart acts", verdict: "contradicted" as const, sources: [], fix: "it was the main regular place fans could see chart acts" }] } };
+  const l: import("../src/lib/types").Lesson = { id: "l", courseId: "c", number: 1, topic: "t", premise: "", readings: [], slides: [sl], status: "draft" };
+  const next = applyFix(l, sl.id, 0)!;
+  assert.equal(next.slides[0].body, "Before MTV, it was the main regular place fans could see chart acts\nAnother point");
+  assert.equal(next.slides[0].check, undefined);
+  assert.equal(applyFix({ ...l, slides: [{ ...sl, body: "different words" }] }, sl.id, 0), null);
+});

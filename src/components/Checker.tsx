@@ -93,7 +93,7 @@ export default function Checker() {
                 <span className={`v ${unv ? "unv" : "ok"}`}>{unv} unverified</span>
                 <span className="v ok">{claims.length - bad - unv} supported</span>
               </div>
-              <Claims claims={claims} />
+              <Claims claims={claims} full />
             </>
           ) : <div className="empty">Results appear here.</div>}
         </section>

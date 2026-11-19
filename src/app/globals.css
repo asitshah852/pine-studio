@@ -534,3 +534,11 @@ h2 { font-size: 28px; }
 
 .pdfline { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 17px; }
 .pdfpanel { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; padding: 14px 0 4px; border-top: 1px dashed var(--line); }
+
+/* compact fact-check results */
+.claims.compact { margin-top: 10px; }
+.claims.compact > div { border-bottom: 0; padding: 0; }
+.claimsum { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; font-size: 17px; }
+.wrongfact { margin-top: 10px; padding: 10px 0 10px 14px; border-left: 2px solid var(--safelight); display: flex; flex-direction: column; gap: 6px; font-size: 18px; }
+.wrongfact .fix { color: var(--ink2); }
+.claimdetails { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; font-size: 16px; color: var(--ink2); }

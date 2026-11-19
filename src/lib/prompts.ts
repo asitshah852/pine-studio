@@ -220,13 +220,14 @@ Check only the KEY facts a student could be misled by: names, dates, titles of w
 Do NOT list: opinions, interpretations, teaching prompts, discussion questions, general statements, or well-known common knowledge.
 Verdicts:
 - "supported" when a reputable source substantially agrees (small differences in wording, rounding or date precision are fine). A source already listed for that part counts — you may cite it.
-- "contradicted" only when a reliable source clearly says otherwise; give the corrected wording.
+- "contradicted" only when a reliable source clearly says otherwise; in "fix" give just the corrected wording, nothing else.
+- "text": quote the claim's words exactly as they appear in the part, so the wording can be swapped in.
 - "unverified" only when you genuinely could not find anything either way.
 Search the web where needed.
 
 ${body || "(no pasted text)"}
 
-Return ONLY JSON: { "claims": [ { "part": "the [id] the claim came from, or 'upload'", "text": "the claim as written", "verdict": "supported | contradicted | unverified", "fix": "corrected wording if contradicted, else empty", "sources": [ { "title": "...", "url": "exact URL you retrieved or that is listed above" } ] } ] }`,
+Return ONLY JSON: { "claims": [ { "part": "the [id] the claim came from, or 'upload'", "text": "the claim as written", "verdict": "supported | contradicted | unverified", "fix": "if contradicted: ONLY the corrected wording, one short sentence that could replace the claim (no explanation); else empty", "sources": [ { "title": "...", "url": "exact URL you retrieved or that is listed above" } ] } ] }`,
   });
   const { text, retrieved } = await ask({ system: HOUSE, search: 10, effort: "medium", content });
   // Sources the slides already carried were found earlier by real searches, so they count as retrieved.
