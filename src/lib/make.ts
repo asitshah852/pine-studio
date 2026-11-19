@@ -3,10 +3,12 @@
 // Each request carries a job key, so a result that finishes after the page closed is picked up later.
 import { apiJob, load } from "./client";
 import { textbookExcerpts } from "./textbooks";
+import { preferredSites } from "./starter";
 import { forget } from "./jobs";
 import { withCheck, withResearch, withSlides } from "./lessonOps";
 import { checkItems } from "./slides";
-import type { Claim, Lesson, ResearchDoc, Resource, Slide } from "./types";
+import { caption } from "./museum";
+import type { Claim, Lesson, Quiz, ResearchDoc, Resource, Slide } from "./types";
 
 type Set = (fn: (l: Lesson) => Lesson) => void;
 
@@ -18,7 +20,7 @@ export async function runResearch(l: Lesson, course: string, set: Set): Promise<
   // Her stored textbooks: the pages that best match the topic go along as a source.
   const books = load<Resource[]>("pine.resources", []);
   const excerpts = await textbookExcerpts(`${l.topic} ${l.premise}`, books).catch(() => []);
-  const r = await apiJob<ResearchDoc>("/api/research", { topic: l.topic, premise: l.premise, course, minutes: l.minutes, excerpts, jobKey: key });
+  const r = await apiJob<ResearchDoc>("/api/research", { topic: l.topic, premise: l.premise, course, minutes: l.minutes, excerpts, preferred: preferredSites(books), clips: l.clips ?? [], jobKey: key });
   set((x) => withResearch(x, r));
   forget(key);
   return r;
@@ -62,4 +64,21 @@ export async function makeClass(l: Lesson, course: string, set: Set, stage: (s: 
   const slides = await runSlides({ ...l, research }, course, set);
   stage("fact-checking");
   await runCheck({ ...l, research, slides }, set, true);
+}
+
+/** Quiz / exit ticket from this class's own research and slides (no new facts). */
+export async function runQuiz(l: Lesson, course: string, set: Set, count = 5): Promise<Quiz> {
+  const key = `quiz:${l.id}`;
+  const paras = (l.research?.sections ?? []).flatMap((s) => s.paragraphs.map((p) => ({ heading: s.heading, text: p.text })));
+  const slides = l.slides.map((s) => ({ title: s.title, body: s.body, caption: s.artworks.map((a) => caption(a)).join("; ") }));
+  const q = await apiJob<Quiz>("/api/quiz", { course, number: l.number, topic: l.topic, premise: l.premise, research: paras, questions: l.research?.questions ?? [], slides, count, jobKey: key });
+  // "R3" / "S5" → words she can follow in the answer key
+  const label = (f: string) => {
+    const k = +f.slice(1) - 1;
+    return f[0] === "R" ? `research: ${paras[k]?.heading ?? ""}` : `slide ${k + 1}: ${l.slides[k]?.title ?? ""}`;
+  };
+  const quiz = { ...q, questions: q.questions.map((x) => ({ ...x, from: label(x.from) })) };
+  set((x) => ({ ...x, quiz }));
+  forget(key);
+  return quiz;
 }

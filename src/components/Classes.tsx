@@ -17,6 +17,8 @@ import type { Lesson, Resource } from "@/lib/types";
 import Improve, { importAll, UploadButton } from "./Improve";
 import Renamable from "./Renamable";
 import Working from "./Working";
+import QuizBox from "./QuizBox";
+import Planner, { MakeQueueNote } from "./Planner";
 import SlideView from "./SlideView";
 
 function Present({ lesson, close }: { lesson: Lesson; close: () => void }) {
@@ -95,7 +97,8 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
           {lesson.premise && <p>{lesson.premise}</p>}
         </div>
         <div className="row">
-          <button className="btn solid" onClick={() => setPresenting(true)} disabled={!lesson.slides.length}>Present</button>
+          {lesson.slides.length > 0 && <Link className="btn solid" href={`/present/${lesson.id}`} title="Your laptop shows notes, the next slide and a clock; the projector shows the slide">presenter view</Link>}
+          <button className="btn" onClick={() => setPresenting(true)} disabled={!lesson.slides.length}>present (one screen)</button>
           <button className="btn" disabled={busy || !lesson.slides.length} onClick={async () => { setBusy(true); try { await downloadPptx(lesson); } finally { setBusy(false); } }}>{busy ? "Building…" : "PowerPoint ↓"}</button>
           {doc && <button className="btn" onClick={() => downloadDocx(lesson, course)}>Document ↓</button>}
           <a className="btn" href={`/handout/${lesson.id}`} target="_blank" rel="noreferrer">Handout ↓</a>
@@ -113,6 +116,7 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
         {r.rights > 0 && <span className="mute">{r.rights} image(s): rights to check</span>}
       </div>
 
+      <QuizBox lesson={lesson} course={course} set={(fn) => updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? fn(l) : l)))} />
       {upErr && <div className="err" style={{ marginBottom: 14 }}>{upErr}</div>}
       <nav className="steps" style={{ marginBottom: 22 }}>
         {(["slides", "document", "materials", "sources"] as const).map((t) => (
@@ -205,6 +209,7 @@ export default function Classes() {
   const [dragL, setDragL] = useState<string | null>(null);
   const [overL, setOverL] = useState<string | null>(null);
   const [copyFor, setCopyFor] = useState<string | null>(null);
+  const [planFor, setPlanFor] = useState<string | null>(null);
 
   // Drag a class to a new place in its course; classes are renumbered 1, 2, 3… in the new order.
   function dropClass(targetId: string) {
@@ -288,6 +293,7 @@ export default function Classes() {
         </div>
       </div>
 
+      <MakeQueueNote />
       {adding && (
         <form className="card row" style={{ marginBottom: 28, maxWidth: 560 }} onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; updateCourses((cur) => [...cur, { id: Math.random().toString(36).slice(2, 10), name: name.trim() }]); setName(""); setAdding(false); }}>
           <input className="input grow" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Course name, e.g. Art Appreciation 103" />
@@ -314,10 +320,12 @@ export default function Classes() {
                     }}>Delete</button>
                     <button className="btn sm" onClick={() => { setExisting(existing === c.id ? null : c.id); setEx({ number: Math.max(0, ...ls.map((l) => l.number)) + 1, topic: "", files: [] }); }}>+ existing class</button>
                     <Link className="btn sm" href={`/prep?new=1&course=${c.id}`}>+ new class</Link>
+                    <button className="btn sm" onClick={() => setPlanFor(planFor === c.id ? null : c.id)}>plan the semester</button>
                   </>
                 )}
               </div>
             </div>
+            {planFor === c.id && <Planner course={c} close={() => setPlanFor(null)} />}
             {existing === c.id && (
               <form className="existing" onSubmit={(e) => { e.preventDefault(); if (ex.files.length) addExisting(c.id); }}>
                 <p className="mute" style={{ margin: 0 }}>Bring in a class you’ve already taught. PowerPoint slides come in as editable slides (with speaker notes and pictures); PDFs and Word files are kept as class materials.</p>

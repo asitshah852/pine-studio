@@ -18,9 +18,10 @@ import type { Artwork, ChatOp, Claim, Lesson, ResearchDoc, Resource, ReviewDoc, 
 import Claims from "./Claims";
 import Improve from "./Improve";
 import Working from "./Working";
+import QuizBox from "./QuizBox";
 import Versions from "./Versions";
 import Talk from "./Talk";
-import { ExhibitsPanel, FilesPanel, LibraryPanel, TextbookPanel } from "./Panels";
+import { ExhibitsPanel, FilesPanel, LibraryPanel, ReusePanel, TextbookPanel } from "./Panels";
 import SlideView from "./SlideView";
 
 type Step = 1 | 2 | 3 | 4;
@@ -288,7 +289,7 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
     if (next) set(() => next);
     return !!next;
   };
-  const [tool, setTool] = useState<"exhibits" | "textbook" | "images" | "library">("exhibits");
+  const [tool, setTool] = useState<"exhibits" | "textbook" | "images" | "library" | "reuse">("exhibits");
   const [q, setQ] = useState("");
   const [over, setOver] = useState<string | null>(null);
   const [count, setCount] = useState(slideCount(lesson.minutes));
@@ -399,8 +400,8 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
   const toolsPanel = (
     <>
           <div className="dtabs" role="tablist">
-            {(more ? (["exhibits", "textbook", "images", "library"] as const) : (["exhibits"] as const)).map((t) => (
-              <button key={t} role="tab" className="dtab mono" aria-selected={tool === t} onClick={() => setTool(t)}>{t === "images" ? "my images" : t}</button>
+            {(more ? (["exhibits", "reuse", "textbook", "images", "library"] as const) : (["exhibits", "reuse"] as const)).map((t) => (
+              <button key={t} role="tab" className="dtab mono" aria-selected={tool === t} onClick={() => setTool(t)}>{t === "images" ? "my images" : t === "reuse" ? "from another class" : t}</button>
             ))}
             {!more && <button className="dtab mono" onClick={() => setMore(true)} title="textbook pages, your own images, library">+ more</button>}
           </div>
@@ -422,6 +423,9 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
                 </>
               )}
               <ExhibitsPanel q={q} setQ={setQ} onAdd={addArt} addLabel="+ To slide" />
+            </div>
+            <div className={tool === "reuse" ? "" : "hide"}>
+              <ReusePanel lesson={lesson} onAdd={(add) => { setSlides((x) => { const i = slide ? x.findIndex((y) => y.id === slide.id) : x.length - 1; const c = [...x]; c.splice(i + 1, 0, ...add); return c; }); if (add[0]) setSel(add[0].id); }} />
             </div>
             <div className={tool === "textbook" ? "" : "hide"}><TextbookPanel books={books} /></div>
             <div className={tool === "images" ? "" : "hide"}><FilesPanel /></div>
@@ -508,6 +512,7 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
             <div className="pptmain">
               <div className="focusnav">
                 <button className="linkish" onClick={() => setMenu(!menu)}>{menu ? "hide menu" : "‹ menu"}</button>
+                <Link className="linkish" href={`/present/${lesson.id}`}>▶ present</Link>
                 <button className="btn" disabled={idx <= 0} onClick={() => go(-1)} aria-label="Previous slide">‹</button>
                 <span>slide {idx + 1} of {lesson.slides.length}</span>
                 <button className="btn" disabled={idx >= lesson.slides.length - 1} onClick={() => go(1)} aria-label="Next slide">›</button>
@@ -520,7 +525,7 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
                 {editorBody}
               </section>
               <div className="focustools">
-                <button className="btn" onClick={() => setTools(!tools)}>{tools ? "close exhibits" : "+ add an exhibit"}</button>
+                <button className="btn" onClick={() => setTools(!tools)}>{tools ? "close" : "+ add an exhibit or slides"}</button>
                 <span className="mute">or use the chat: “simplify this slide”, “find a better picture for this”</span>
               </div>
               {tools && <div className="focusdrawer">{toolsPanel}</div>}
@@ -639,6 +644,7 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
           );
         })}
       </div>
+      <QuizBox lesson={lesson} course={course} set={set} />
       <div className="nextbar">
         <div className="row">
           <button className="btn ghost" disabled={pptx || !lesson.slides.length} onClick={async () => { setPptx(true); try { await downloadPptx(lesson); } finally { setPptx(false); } }}>{pptx ? "Building…" : "PowerPoint ↓"}</button>

@@ -77,3 +77,44 @@ export async function downloadDocx(lesson: Lesson, course: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+
+/** Quiz / exit ticket as Word: the student page first, then the answer key on its own page. */
+export async function downloadQuiz(lesson: Lesson, course: string) {
+  const qz = lesson.quiz;
+  if (!qz) return;
+  const d = await import("docx");
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, PageBreak } = d;
+  const font = "Helvetica";
+  const L = "ABCDEFG";
+  const p = (text: string, o: { bold?: boolean; italics?: boolean; color?: string; before?: number; size?: number } = {}) =>
+    new Paragraph({ spacing: { before: o.before ?? 0, after: 80 }, children: [new TextRun({ text, font, bold: o.bold, italics: o.italics, color: o.color, size: o.size })] });
+  const head = `${course} · Class ${lesson.number}`.toUpperCase();
+  const kids = [
+    p(head, { color: "777777", size: 18 }),
+    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: `${lesson.topic} — quiz`, font })] }),
+    p("Name: ______________________________        Date: ______________", { before: 120 }),
+  ];
+  qz.questions.forEach((q, i) => {
+    kids.push(p(`${i + 1}. ${q.q}`, { bold: true, before: 240 }));
+    if (q.kind === "choice") q.options!.forEach((o, k) => kids.push(p(`    ${L[k]})  ${o}`)));
+    else kids.push(p("______________________________________________________________"), p("______________________________________________________________"));
+  });
+  if (qz.exit.length) {
+    kids.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 360 }, children: [new TextRun({ text: "Exit ticket", font })] }));
+    qz.exit.forEach((e) => kids.push(p(e, { before: 120 }), p("______________________________________________________________"), p("______________________________________________________________")));
+  }
+  kids.push(new Paragraph({ children: [new PageBreak()] }));
+  kids.push(p(head, { color: "777777", size: 18 }));
+  kids.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: "Answer key (for you)", font })] }));
+  qz.questions.forEach((q, i) => {
+    const k = q.kind === "choice" ? q.options!.indexOf(q.answer) : -1;
+    kids.push(p(`${i + 1}. ${k >= 0 ? `${L[k]})  ` : ""}${q.answer}`, { before: 160 }));
+    kids.push(p(`from ${q.from}`, { italics: true, color: "777777", size: 18 }));
+  });
+  const blob = await Packer.toBlob(new Document({ creator: "pine studio", title: `${lesson.topic} quiz`, sections: [{ children: kids }] }));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `Class ${String(lesson.number).padStart(2, "0")} - ${lesson.topic} - quiz`.replace(/[^\w\s-]/g, "").slice(0, 90) + ".docx";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}

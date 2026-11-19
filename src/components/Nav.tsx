@@ -45,7 +45,7 @@ export default function Nav() {
     document.documentElement.dataset.theme = next ? "dark" : "light";
   }
 
-  if (path.startsWith("/handout")) return null; // the handout is a clean printable page
+  if (/^\/(handout|present|show|clip|quiz)(\/|$)/.test(path)) return null; // pages that stand on their own
   return (
     <aside className="side">
       <Link href="/" className="mark">pine studio</Link>
@@ -97,6 +97,7 @@ export default function Nav() {
         <span title={st ? `Research & fact-check: ${st.claude ? "on" : "off"}. Saving: ${st.db ? "shared across devices" : "this browser only"}.` : ""}>
           {st ? (st.claude ? "research on" : "research off") : ""}
         </span>
+        <Link className="linkish" href="/clipper" title="Send any web page to a class from your bookmarks bar">clip button</Link>
         <button className="linkish" onClick={toggle} aria-pressed={dark}>{dark ? "daylight" : "darkroom"}</button>
       </div>
       {needPass && (

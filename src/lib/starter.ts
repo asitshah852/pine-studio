@@ -71,6 +71,21 @@ export const STARTER_RESOURCES: Resource[] = [
   }),
   r({
     kind: "museum",
+    title: "The Met — collection search (open access)",
+    publisher: "The Metropolitan Museum of Art",
+    url: "https://www.metmuseum.org/art/collection/search",
+    topics: ["images", "exhibits"],
+    notes: "Public-domain images and data free to use (CC0). Pine Studio's Exhibits search uses The Met's open API.",
+  }),
+  r({
+    kind: "museum",
+    title: "Cleveland Museum of Art — open access collection",
+    url: "https://www.clevelandart.org/open-access",
+    topics: ["images", "exhibits"],
+    notes: "About 30,000 public-domain images free to use (CC0). Pine Studio's Exhibits search uses Cleveland's open API.",
+  }),
+  r({
+    kind: "museum",
     title: "Art Institute of Chicago — educator resources (Ryan Learning Center)",
     url: "https://www.artic.edu/ryan-learning-center",
     topics: ["Chicago", "teaching", "field trip"],
@@ -157,4 +172,36 @@ export function findLinks(title: string, author = ""): { label: string; url: str
     { label: "WorldCat (nearby libraries)", url: `https://search.worldcat.org/search?q=${q}` },
     { label: "Google Scholar", url: `https://scholar.google.com/scholar?q=${q}` },
   ];
+}
+
+/** Entries added to the starter list after launch: added once to existing libraries (matched by link). */
+export const STARTER_ADDITIONS = STARTER_RESOURCES.filter((r) => /metmuseum\.org\/art\/collection|clevelandart\.org\/open-access/.test(r.url ?? ""));
+
+const SEARCHED = /(^|\.)(artic\.edu|metmuseum\.org|clevelandart\.org|loc\.gov)$/;
+/** How pine studio uses a Library entry (shown as a small label). */
+export function usage(r: { url?: string; kind: string; pdf?: unknown }): "searched" | "research" | "copy" | "link" {
+  if (r.pdf) return "copy";
+  let host = "";
+  try {
+    host = r.url ? new URL(r.url).hostname.replace(/^www\./, "") : "";
+  } catch {
+    /* not a link */
+  }
+  if (host && SEARCHED.test(host) && (r.kind === "museum" || /pictures|collection|open-access/.test(r.url ?? ""))) return "searched";
+  if (host && r.kind !== "other") return "research";
+  return "link";
+}
+
+/** Sites in her Library that research should prefer (hostnames). */
+export function preferredSites(list: { url?: string; kind: string }[]): string[] {
+  const out = new Set<string>();
+  for (const r of list) {
+    if (!r.url || r.kind === "other") continue;
+    try {
+      out.add(new URL(r.url).hostname.replace(/^www\./, ""));
+    } catch {
+      /* skip */
+    }
+  }
+  return [...out].slice(0, 25);
 }

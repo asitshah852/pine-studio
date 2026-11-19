@@ -225,3 +225,22 @@ test("YouTube links of every common shape give the video id", async () => {
     assert.equal(videoId(u), "W8r-tXRLazs");
   assert.equal(videoId("https://example.org/watch?v=W8r-tXRLazs"), null);
 });
+
+test("Library labels say how each entry is used, and preferred sites are hostnames", async () => {
+  const { usage, preferredSites, STARTER_ADDITIONS } = await import("../src/lib/starter");
+  const r = (over: object) => ({ id: "x", kind: "website", title: "T", topics: [], notes: "", addedAt: "", ...over }) as import("../src/lib/types").Resource;
+  assert.equal(usage(r({ kind: "museum", url: "https://www.artic.edu/collection" })), "searched");
+  assert.equal(usage(r({ url: "https://smarthistory.org/" })), "research");
+  assert.equal(usage(r({ kind: "textbook", url: "https://openstax.org/x", pdf: { path: "p", name: "n", size: 1 } })), "copy");
+  assert.equal(usage(r({ kind: "other" })), "link");
+  assert.ok(STARTER_ADDITIONS.some((x) => /clevelandart/.test(x.url ?? "")) && STARTER_ADDITIONS.some((x) => /metmuseum/.test(x.url ?? "")));
+  const sites = preferredSites([r({ url: "https://www.smarthistory.org/a" }), r({ url: "https://smarthistory.org/b" })]);
+  assert.ok(sites.every((s) => /^[\w.-]+$/.test(s)) && sites.length === new Set(sites).size);
+});
+
+test("clipping an ordinary page isn't mistaken for a museum object", async () => {
+  const { fromMuseumLink } = await import("../src/lib/museum");
+  assert.equal(await fromMuseumLink("https://smarthistory.org/seurat-la-grande-jatte/"), null);
+  assert.equal(await fromMuseumLink("https://www.artic.edu/exhibitions"), null);
+  assert.equal(await fromMuseumLink("not a link"), null);
+});

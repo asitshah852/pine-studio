@@ -49,7 +49,7 @@ export type Slide = {
   fromDeck?: boolean; // imported from her own PowerPoint (keeps its original notes)
 };
 
-export type Course = { id: string; name: string; example?: boolean };
+export type Course = { id: string; name: string; example?: boolean; plan?: Plan };
 
 export type Paragraph = { id: string; text: string; sources: Source[]; verified: boolean; edited?: boolean };
 
@@ -136,6 +136,16 @@ export type ChatMessage = {
   undone?: boolean;
 };
 
+/** Quiz / exit ticket built only from the class's own research and slides. */
+export type QuizQuestion = { id: string; kind: "choice" | "short"; q: string; options?: string[]; answer: string; from: string };
+export type Quiz = { at: string; questions: QuizQuestion[]; exit: string[] };
+
+/** Semester planner: a suggested class for a course, before it is created. */
+export type PlanItem = { id: string; week: number; topic: string; premise: string; theme?: string; use: boolean };
+export type Plan = { at: string; weeks: number; perWeek: number; themes: string; items: PlanItem[] };
+
+export type Clip = { id: string; url: string; title: string; text?: string; note?: string; at: string };
+
 export type Lesson = {
   id: string;
   courseId: string;
@@ -146,6 +156,8 @@ export type Lesson = {
   research?: ResearchDoc;
   materials?: Material[]; // files she uploaded (her existing class materials)
   review?: ReviewDoc; // "suggest improvements"
+  clips?: Clip[]; // pages she sent from her browser with the clip button
+  quiz?: Quiz; // quiz / exit ticket from this class's research and slides
   chat?: ChatMessage[]; // "talk it through" conversation (last 40)
   versions?: Version[]; // earlier research / slides / reviews, newest first (restore from Prep)
   readings: string[]; // resource ids

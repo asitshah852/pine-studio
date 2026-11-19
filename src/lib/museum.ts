@@ -17,7 +17,16 @@ export async function searchAIC(q: string, limit = 18): Promise<Artwork[]> {
   if (!r.ok) throw new Error(`Art Institute search failed (${r.status})`);
   const j = (await r.json()) as { data?: Record<string, unknown>[]; config?: { iiif_url?: string } };
   const iiif = j.config?.iiif_url || "https://www.artic.edu/iiif/2";
-  return (j.data ?? []).map((a) => {
+  return (j.data ?? []).map((a) => mapAIC(a, iiif));
+}
+
+const AIC_FIELDS = [
+  "id", "title", "artist_display", "artist_title", "date_display", "medium_display",
+  "dimensions", "place_of_origin", "credit_line", "image_id", "is_public_domain",
+].join(",");
+
+function mapAIC(a: Record<string, unknown>, iiif: string): Artwork {
+  {
     const pd = a.is_public_domain === true;
     const img = typeof a.image_id === "string" && a.image_id ? a.image_id : "";
     return {
@@ -35,7 +44,7 @@ export async function searchAIC(q: string, limit = 18): Promise<Artwork[]> {
       imageUrl: pd && img ? `${iiif}/${img}/full/1686,/0/default.jpg` : undefined,
       thumbUrl: img ? `${iiif}/${img}/full/400,/0/default.jpg` : undefined,
     };
-  });
+  }
 }
 
 export async function searchMet(q: string, limit = 12): Promise<Artwork[]> {
@@ -60,7 +69,11 @@ export async function searchMet(q: string, limit = 12): Promise<Artwork[]> {
   );
   return objs
     .filter((o): o is Record<string, unknown> => !!o && !!o.objectID)
-    .map((o) => {
+    .map(mapMet);
+}
+
+function mapMet(o: Record<string, unknown>): Artwork {
+  {
       const pd = o.isPublicDomain === true;
       const artist = [clean(o.artistDisplayName), clean(o.artistDisplayBio) && `(${clean(o.artistDisplayBio)})`]
         .filter(Boolean)
@@ -80,7 +93,7 @@ export async function searchMet(q: string, limit = 12): Promise<Artwork[]> {
         imageUrl: pd ? clean(o.primaryImage) || undefined : undefined,
         thumbUrl: clean(o.primaryImageSmall) || undefined,
       };
-    });
+  }
 }
 
 export async function searchCleveland(q: string, limit = 12): Promise<Artwork[]> {
@@ -90,7 +103,12 @@ export async function searchCleveland(q: string, limit = 12): Promise<Artwork[]>
   );
   if (!r.ok) throw new Error(`Cleveland search failed (${r.status})`);
   const j = (await r.json()) as { data?: Record<string, any>[] };
-  return (j.data ?? []).map((o) => {
+  return (j.data ?? []).map(mapCleveland);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapCleveland(o: Record<string, any>): Artwork {
+  {
     const pd = o.share_license_status === "CC0";
     const web = clean(o.images?.web?.url);
     return {
@@ -108,7 +126,48 @@ export async function searchCleveland(q: string, limit = 12): Promise<Artwork[]>
       imageUrl: pd ? clean(o.images?.print?.url) || web || undefined : undefined,
       thumbUrl: web || undefined,
     };
-  });
+  }
+}
+
+/** A museum object page she clipped (AIC, Met or Cleveland) → its record from the museum's own API.
+ *  Returns null for any other page. */
+export async function fromMuseumLink(link: string): Promise<Artwork | null> {
+  let u: URL;
+  try {
+    u = new URL(link);
+  } catch {
+    return null;
+  }
+  const host = u.hostname.replace(/^www\./, "");
+  if (host === "artic.edu") {
+    const id = u.pathname.match(/^\/artworks\/(\d+)/)?.[1];
+    if (!id) return null;
+    const r = await fetch(`https://api.artic.edu/api/v1/artworks/${id}?fields=${AIC_FIELDS}`, { headers: UA });
+    if (!r.ok) throw new Error(`Art Institute record not found (${r.status})`);
+    const j = (await r.json()) as { data?: Record<string, unknown>; config?: { iiif_url?: string } };
+    return j.data ? mapAIC(j.data, j.config?.iiif_url || "https://www.artic.edu/iiif/2") : null;
+  }
+  if (host === "metmuseum.org") {
+    const id = u.pathname.match(/\/art\/collection\/search\/(\d+)/)?.[1];
+    if (!id) return null;
+    const r = await fetch(`https://collectionapi.metmuseum.org/public/collection/v1/objects/${id}`, { headers: UA });
+    if (!r.ok) throw new Error(`Met record not found (${r.status})`);
+    return mapMet((await r.json()) as Record<string, unknown>);
+  }
+  if (host === "clevelandart.org") {
+    const acc = decodeURIComponent(u.pathname.match(/^\/art\/([^/?#]+)/)?.[1] ?? "");
+    if (!acc) return null;
+    // The open-access API looks an artwork up by its id or accession number.
+    const r = await fetch(`https://openaccess-api.clevelandart.org/api/artworks/${encodeURIComponent(acc)}`, { headers: UA });
+    if (r.ok) {
+      const j = (await r.json()) as { data?: Record<string, unknown> };
+      if (j.data) return mapCleveland(j.data);
+    }
+    const hit = (await searchCleveland(acc, 5)).find((a) => a.url.toLowerCase().includes(acc.toLowerCase()));
+    if (!hit) throw new Error("Cleveland record not found");
+    return hit;
+  }
+  return null;
 }
 
 /** The caption line used on slides, built only from the museum record. */

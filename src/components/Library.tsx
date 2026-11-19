@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { api, uid, useCollection, useStatus } from "@/lib/client";
 import { pdfUrl } from "@/lib/textbooks";
 import { clearPdfError, enqueuePdf, resumePdfs, usePdfQueue } from "@/lib/pdfQueue";
-import { STARTER_RESOURCES, findLinks } from "@/lib/starter";
+import { STARTER_ADDITIONS, STARTER_RESOURCES, findLinks, usage } from "@/lib/starter";
+import { load as loadLocal, save as saveLocal } from "@/lib/client";
 import type { Resource, ResourceKind } from "@/lib/types";
 
 const isFreeBook = (r: Resource) => r.kind === "textbook" && /free|open|CC BY/i.test(`${r.publisher ?? ""} ${r.notes}`);
@@ -21,7 +22,7 @@ const KIND_LABEL: Record<ResourceKind, string> = { textbook: "Textbook", journal
 const blank = { kind: "textbook" as ResourceKind, title: "", url: "", author: "", year: "", publisher: "", notes: "" };
 
 export default function Library() {
-  const { items, update } = useCollection<Resource>("resources", STARTER_RESOURCES);
+  const { items, update, ready: libReady } = useCollection<Resource>("resources", STARTER_RESOURCES);
   const [q, setQ] = useState("");
   const [onlySaved, setOnlySaved] = useState(false);
   const [form, setForm] = useState(blank);
@@ -34,6 +35,16 @@ export default function Library() {
   const [pdfLink, setPdfLink] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pq = usePdfQueue();
+  // Add entries that joined the starter list after launch (once, matched by link).
+  useEffect(() => {
+    if (!libReady || loadLocal<boolean>("pine.starter.v2", false)) return;
+    update((cur) => {
+      const missing = STARTER_ADDITIONS.filter((a) => !cur.some((r) => r.url === a.url));
+      return missing.length ? [...cur, ...missing.map((m) => ({ ...m, id: uid() }))] : cur;
+    });
+    saveLocal("pine.starter.v2", true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libReady]);
   useEffect(() => {
     resumePdfs((id, pdf) => update((cur) => cur.map((r) => (r.id === id ? { ...r, pdf } : r))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -178,6 +189,9 @@ export default function Library() {
                   {r.url ? <a href={r.url} target="_blank" rel="noreferrer">{r.title}</a> : r.title}
                   {r.pdf && <a className="savedtag" href={pdfUrl(r.pdf.path)} target="_blank" rel="noreferrer" title="Your stored copy — click to open">saved</a>}
                 </h3>
+                <div className={`usage ${usage(r)}`}>
+                  {{ searched: "searched by pine studio for exhibits", research: "research prefers this site", copy: "your stored copy — research reads it", link: "a link to browse" }[usage(r)]}
+                </div>
                 {(r.author || r.publisher || r.year) && <div className="src">{[r.author, r.publisher, r.year].filter(Boolean).join(" · ")}</div>}
                 {r.notes && <p>{r.notes}</p>}
                 {r.pdf && (

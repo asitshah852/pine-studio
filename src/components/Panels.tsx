@@ -1,10 +1,12 @@
 "use client";
 // Tool panels used in Prep (Slides step): exhibit search, textbook pages, her own images, library.
 import { useEffect, useState } from "react";
-import { api, proxied, readAsBase64, shrinkImage, useStatus } from "@/lib/client";
+import { api, proxied, readAsBase64, shrinkImage, uid, useStatus } from "@/lib/client";
+import { useStudio } from "@/lib/studio";
+import SlideView from "./SlideView";
 import { startDrag } from "@/lib/drag";
 import Working from "./Working";
-import type { Artwork, Lesson, Resource, TextbookPoint } from "@/lib/types";
+import type { Artwork, Lesson, Resource, Slide, TextbookPoint } from "@/lib/types";
 
 const MAX_UPLOAD = 3_800_000; // the host accepts ~4.5 MB per request
 
@@ -200,3 +202,44 @@ export function LibraryPanel({ lesson, resources, toggle }: { lesson: Lesson; re
   );
 }
 
+
+/** Reuse slides from another class: pick a class, tick slides, copy them in after the current slide. */
+export function ReusePanel({ lesson, onAdd }: { lesson: Lesson; onAdd: (slides: Slide[]) => void }) {
+  const { lessons, courseName } = useStudio();
+  const others = lessons.filter((l) => l.id !== lesson.id && l.slides.length);
+  const [from, setFrom] = useState<string>("");
+  const [picked, setPicked] = useState<string[]>([]);
+  const src = others.find((l) => l.id === from);
+  if (!others.length) return <p className="mute">No other class has slides yet.</p>;
+  const copy = () => {
+    if (!src) return;
+    // fresh ids; the fact-check is cleared because the slide now sits in a different class
+    onAdd(src.slides.filter((s) => picked.includes(s.id)).map((s) => ({ ...s, id: uid(), check: undefined, fromDeck: s.fromDeck })));
+    setPicked([]);
+  };
+  return (
+    <div className="stack">
+      <select className="select" value={from} onChange={(e) => { setFrom(e.target.value); setPicked([]); }} aria-label="Class to copy from">
+        <option value="">choose a class…</option>
+        {others.map((l) => <option key={l.id} value={l.id}>{courseName(l.courseId)} · {String(l.number).padStart(2, "0")} {l.topic} ({l.slides.length})</option>)}
+      </select>
+      {src && (
+        <>
+          <div className="row" style={{ gap: 14 }}>
+            <button className="linkish" onClick={() => setPicked(picked.length === src.slides.length ? [] : src.slides.map((s) => s.id))}>{picked.length === src.slides.length ? "untick all" : "tick all"}</button>
+            <button className="btn" disabled={!picked.length} onClick={copy}>copy {picked.length || ""} slide{picked.length === 1 ? "" : "s"} in after this one</button>
+          </div>
+          <div className="reuse">
+            {src.slides.map((s, i) => (
+              <label key={s.id} className={`reuseitem ${picked.includes(s.id) ? "on" : ""}`}>
+                <input type="checkbox" checked={picked.includes(s.id)} onChange={() => setPicked((p) => (p.includes(s.id) ? p.filter((x) => x !== s.id) : [...p, s.id]))} />
+                <SlideView s={s} n={src.number} />
+                <span className="mute">{i + 1}. {s.title || "untitled"}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

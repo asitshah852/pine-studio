@@ -1,7 +1,7 @@
 // The three Claude jobs: research a topic, pull points from her textbook, fact-check text.
 import { ask, groundSources, normUrl, parseJson } from "./claude";
 import { caption, findWork } from "./museum";
-import type { Artwork, Claim, ExhibitSuggestion, ResearchDoc, ReviewDoc, Slide, Source, Suggestion, TextbookPoint, Verdict } from "./types";
+import type { Artwork, Claim, ExhibitSuggestion, PlanItem, Quiz, QuizQuestion, ResearchDoc, ReviewDoc, Slide, Source, Suggestion, TextbookPoint, Verdict } from "./types";
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 
@@ -14,7 +14,19 @@ Rules you never break:
 
 export type Excerpt = { book: string; path: string; page: number; text: string; url: string };
 
-export async function research(topic: string, premise: string, course: string, minutes?: number, pages: Excerpt[] = []): Promise<ResearchDoc> {
+export async function research(
+  topic: string,
+  premise: string,
+  course: string,
+  minutes?: number,
+  pages: Excerpt[] = [],
+  preferred: string[] = [],
+  clips: { url: string; title: string; text?: string; note?: string }[] = [],
+): Promise<ResearchDoc> {
+  const trusted = preferred.length ? `\n\nSites in her own Library — prefer these when they cover the topic: ${preferred.join(", ")}.` : "";
+  const clipped = clips.length
+    ? `\n\nPAGES SHE CLIPPED FOR THIS CLASS (use them where relevant; you may cite them by URL):\n${clips.map((c) => `- ${c.title} — ${c.url}${c.note ? ` — her note: ${c.note}` : ""}${c.text ? `\n  excerpt: ${c.text.slice(0, 1500)}` : ""}`).join("\n")}`
+    : "";
   const textbook = pages.length
     ? `\n\nHER COURSE TEXTBOOKS — pages from her own stored copies that match this topic. Use them where relevant (students have these books), alongside the web. To cite one, put { "textbook": N } in that paragraph's sources.\n${pages.map((p, i) => `[textbook ${i + 1}] ${p.book}, PDF page ${p.page}:\n${p.text}`).join("\n\n")}`
     : "";
@@ -28,7 +40,7 @@ export async function research(topic: string, premise: string, course: string, m
         text: `Write the research document for a class in "${course || "Art Appreciation"}".
 Topic: "${topic}".${premise ? `\nHer premise / angle: ${premise}` : ""}${minutes ? `\nThe class is ${minutes} minutes long.` : ""}
 
-The document is 1–2 pages (about 700–1,000 words) that she can teach from and keep: clear sections, plain language, every factual sentence sourced.${textbook}
+The document is 1–2 pages (about 700–1,000 words) that she can teach from and keep: clear sections, plain language, every factual sentence sourced.${textbook}${clipped}${trusted}
 
 Return ONLY a JSON object (in a \`\`\`json block):
 {
@@ -46,6 +58,8 @@ Return ONLY a JSON object (in a \`\`\`json block):
     questions?: string[];
     exhibits?: { type?: string; artist?: string; title?: string; date?: string; why?: string }[];
   };
+  // Pages she clipped herself count as real sources.
+  for (const c of clips) retrieved.set(normUrl(c.url), c.title);
   const raw = parseJson<Raw>(text);
   const sections = (raw.sections ?? [])
     .filter((s) => s?.paragraphs?.length)
@@ -55,7 +69,7 @@ Return ONLY a JSON object (in a \`\`\`json block):
       paragraphs: (s.paragraphs ?? [])
         .filter((p) => p?.text)
         .map((p) => {
-          const web = groundSources(p.sources?.filter((x) => !x?.textbook), retrieved);
+          const web = groundSources(p.sources?.filter((x) => !x?.textbook), retrieved, true);
           // Pages from her own textbooks are real sources too (she can open them at that page).
           const books = (p.sources ?? [])
             .map((x) => (x?.textbook ? pages[Number(x.textbook) - 1] : undefined))
@@ -346,4 +360,105 @@ Review it and return ONLY JSON (in a \`\`\`json block):
     questions: (raw.questions ?? []).filter((q) => typeof q === "string").slice(0, 8),
     exhibits,
   };
+}
+
+
+/** Quiz / exit ticket: ONLY from what this class already says (its research and slides), so every
+ *  answer is something she taught. No web search; each question names where its answer comes from. */
+export async function quiz(input: {
+  course: string;
+  number: number;
+  topic: string;
+  premise: string;
+  research: { heading: string; text: string }[];
+  questions: string[];
+  slides: { title: string; body: string; caption?: string }[];
+  count?: number;
+}): Promise<Quiz> {
+  const n = Math.max(3, Math.min(10, input.count ?? 5));
+  const doc = input.research.map((p, i) => `[R${i + 1}] (${p.heading}) ${p.text}`).join("\n").slice(0, 50_000);
+  const deck = input.slides.map((s, i) => `[S${i + 1}] ${s.title}${s.caption ? ` — ${s.caption}` : ""}\n${s.body}`).join("\n\n").slice(0, 30_000);
+  const { text } = await ask({
+    system: `You write short quizzes for Tanya's undergraduate Art Appreciation class.
+Rules you never break:
+- Use ONLY facts stated in the class material below (research paragraphs [R..] and slides [S..]). Never add a fact, date, name or attribution that is not written there.
+- Every question's "from" names the paragraph or slide its answer comes from, e.g. "R3" or "S5".
+- Plain, friendly language for first- and second-year students. Test understanding and looking, not trivia.
+- Multiple-choice wrong options must be clearly wrong to someone who attended, but plausible; never trick questions.`,
+    effort: "medium",
+    content: [
+      {
+        type: "text",
+        text: `Class ${input.number} of ${input.course || "the course"}: "${input.topic}".${input.premise ? ` Premise: ${input.premise}` : ""}
+
+RESEARCH:
+${doc || "(none)"}
+
+SLIDES:
+${deck || "(none)"}
+
+DISCUSSION QUESTIONS SHE PLANNED:
+${input.questions.join("\n") || "(none)"}
+
+Write a ${n}-question quiz (about two-thirds multiple choice with 4 options, the rest short answer) and 2 exit-ticket prompts (one-minute reflections, opinion welcome, no single right answer).
+Return ONLY JSON (in a \`\`\`json block):
+{ "questions": [ { "kind": "choice | short", "q": "...", "options": ["A", "B", "C", "D"], "answer": "the correct option's exact text, or a model answer in one or two sentences", "from": "R2" } ],
+  "exit": ["...", "..."] }`,
+      },
+    ],
+  });
+  const out = parseJson<{ questions?: Partial<QuizQuestion>[]; exit?: string[] }>(text);
+  const max = input.research.length;
+  const smax = input.slides.length;
+  const valid = (f: string) => /^(R(\d+)|S(\d+))$/.test(f) && (f[0] === "R" ? +f.slice(1) <= max : +f.slice(1) <= smax) && +f.slice(1) >= 1;
+  const questions: QuizQuestion[] = (out.questions ?? [])
+    .filter((q) => q.q && q.answer)
+    .map((q) => {
+      const kind: QuizQuestion["kind"] = q.kind === "choice" && Array.isArray(q.options) && q.options.length >= 2 ? "choice" : "short";
+      return { id: rid(), kind, q: String(q.q), options: kind === "choice" ? q.options!.map(String).slice(0, 5) : undefined, answer: String(q.answer), from: valid(String(q.from ?? "").trim()) ? String(q.from).trim() : "" };
+    })
+    // a question whose answer can't be traced to the class material is dropped
+    .filter((q) => q.from && (q.kind === "short" || q.options!.includes(q.answer)));
+  if (!questions.length) throw new Error("Couldn't write questions from this class's material. Make the research or slides first.");
+  return { at: new Date().toISOString(), questions, exit: (out.exit ?? []).map(String).filter(Boolean).slice(0, 3) };
+}
+
+/** Semester planner: a sequence of class topics with a one-line premise each. It is a teaching plan
+ *  (opinion), so no facts are stated; each class's facts are researched and sourced when it is made. */
+export async function plan(input: {
+  course: string;
+  weeks: number;
+  perWeek: number;
+  minutes?: number;
+  themes: string;
+  existing: { number: number; topic: string }[];
+}): Promise<PlanItem[]> {
+  const weeks = Math.max(1, Math.min(18, input.weeks));
+  const per = Math.max(1, Math.min(3, input.perWeek));
+  const { text } = await ask({
+    system: `You help Tanya, an adjunct professor with an MFA in photography, plan an undergraduate course (Chicago community college students, many new to art).
+- Suggest a clear, teachable sequence: each class builds on the last; mix periods, media, cultures and voices; leave room for a review class before a midterm/final if the semester is long enough.
+- Topics and premises are teaching ideas, not facts: do NOT state dates, names of specific works, attributions or numbers. Those are researched and sourced later, class by class.
+- Premise = her angle in one plain sentence (the question or idea the class explores).`,
+    effort: "medium",
+    content: [
+      {
+        type: "text",
+        text: `Course: ${input.course || "Art Appreciation"}.
+Length: ${weeks} weeks, ${per} class${per > 1 ? "es" : ""} a week${input.minutes ? `, ${input.minutes} minutes each` : ""} = ${weeks * per} classes.
+Her themes / must-cover topics / notes: ${input.themes || "(none — use a standard Art Appreciation arc)"}
+Classes she already has (keep them, plan around them, don't repeat them):
+${input.existing.map((e) => `${e.number}. ${e.topic}`).join("\n") || "(none)"}
+
+Return ONLY JSON (in a \`\`\`json block): { "items": [ { "week": 1, "topic": "short class title", "premise": "one sentence", "theme": "which of her themes it serves, or empty" } ] }
+Exactly ${Math.max(1, weeks * per - input.existing.length)} items for the classes she does NOT have yet, in teaching order.`,
+      },
+    ],
+  });
+  const out = parseJson<{ items?: Partial<PlanItem>[] }>(text);
+  const items = (out.items ?? [])
+    .filter((x) => x.topic)
+    .map((x) => ({ id: rid(), week: Math.max(1, Math.min(weeks, Number(x.week) || 1)), topic: String(x.topic).slice(0, 120), premise: String(x.premise ?? "").slice(0, 400), theme: x.theme ? String(x.theme).slice(0, 80) : undefined, use: true }));
+  if (!items.length) throw new Error("Couldn't make a plan. Try adding a few themes.");
+  return items;
 }
