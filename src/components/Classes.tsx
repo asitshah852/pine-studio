@@ -11,7 +11,10 @@ import { downloadPptx } from "@/lib/pptx";
 import { deckSources, readiness } from "@/lib/slides";
 import { STARTER_RESOURCES } from "@/lib/starter";
 import { OTHER, pad, useStudio } from "@/lib/studio";
+import { ACCEPT } from "@/lib/importers";
+import { uid } from "@/lib/client";
 import type { Lesson, Resource } from "@/lib/types";
+import Improve, { importAll, UploadButton } from "./Improve";
 import SlideView from "./SlideView";
 
 function Present({ lesson, close }: { lesson: Lesson; close: () => void }) {
@@ -47,7 +50,17 @@ function Present({ lesson, close }: { lesson: Lesson; close: () => void }) {
 function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; back: () => void }) {
   const { updateLessons } = useStudio();
   const { items: resources } = useCollection<Resource>("resources", STARTER_RESOURCES);
-  const [tab, setTab] = useState<"slides" | "document" | "sources">("slides");
+  const [tab, setTab] = useState<"slides" | "document" | "materials" | "sources">("slides");
+  const [uploading, setUploading] = useState("");
+  const [upErr, setUpErr] = useState("");
+  async function upload(files: File[]) {
+    setUpErr("");
+    const r = await importAll(files, setUploading);
+    setUploading("");
+    if (r.errors.length) setUpErr(r.errors.join(" "));
+    updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? { ...l, slides: [...l.slides, ...r.slides], materials: [...(l.materials ?? []), ...r.materials] } : l)));
+    setTab(r.slides.length ? "slides" : "materials");
+  }
   const [presenting, setPresenting] = useState(false);
   const [busy, setBusy] = useState(false);
   const r = readiness(lesson);
@@ -69,6 +82,8 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
           <button className="btn solid" onClick={() => setPresenting(true)} disabled={!lesson.slides.length}>Present</button>
           <button className="btn" disabled={busy || !lesson.slides.length} onClick={async () => { setBusy(true); try { await downloadPptx(lesson); } finally { setBusy(false); } }}>{busy ? "Building…" : "PowerPoint ↓"}</button>
           {doc && <button className="btn" onClick={() => downloadDocx(lesson, course)}>Document ↓</button>}
+          <Link className="btn ghost" href={`/prep?lesson=${lesson.id}&improve=1`}>suggest improvements</Link>
+          <UploadButton label="+ add materials" onFiles={upload} busy={uploading} />
           <Link className="btn ghost" href={`/prep?lesson=${lesson.id}`}>Edit in Prep</Link>
           <button className="btn ghost" onClick={() => { if (confirm(`Delete Class ${lesson.number}: ${lesson.topic}? This removes its research and slides.`)) { updateLessons((cur) => cur.filter((l) => l.id !== lesson.id)); back(); } }}>Delete</button>
         </div>
@@ -81,13 +96,19 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
         {r.rights > 0 && <span className="mute">{r.rights} image(s): rights to check</span>}
       </div>
 
+      {upErr && <div className="err" style={{ marginBottom: 14 }}>{upErr}</div>}
       <nav className="steps" style={{ marginBottom: 22 }}>
-        {(["slides", "document", "sources"] as const).map((t) => (
+        {(["slides", "document", "materials", "sources"] as const).map((t) => (
           <button key={t} className="stepb" aria-current={tab === t ? "step" : undefined} onClick={() => setTab(t)}>
-            {t === "slides" ? `Slides · ${lesson.slides.length}` : t === "document" ? "Research document" : "Sources & readings"}
+            {t === "slides" ? `Slides · ${lesson.slides.length}` : t === "document" ? "Research document" : t === "materials" ? `Your materials · ${lesson.materials?.length ?? 0}` : "Sources & readings"}
           </button>
         ))}
       </nav>
+      {tab === "materials" && (
+        (lesson.materials?.length ?? 0) ? (
+          <Improve lesson={lesson} course={course} set={(fn) => updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? fn(l) : l)))} />
+        ) : <div className="empty">No uploaded files. Use “+ add materials” to bring in your slides (PowerPoint), handouts (PDF, Word) or images.</div>
+      )}
 
       {tab === "slides" &&
         (lesson.slides.length ? (
@@ -98,7 +119,7 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
                 <div>
                   <div className="mono mute">{pad(i + 1)}</div>
                   <h3 style={{ fontSize: 17, fontWeight: 500 }}>{s.title || "Untitled"}</h3>
-                  {s.notes ? <p style={{ margin: "6px 0 0", fontSize: 14, whiteSpace: "pre-wrap" }}>{s.notes}</p> : <p className="mute" style={{ margin: "6px 0 0" }}>No speaker notes.</p>}
+                  {s.notes ? <p style={{ margin: "6px 0 0", fontSize: 17, whiteSpace: "pre-wrap" }}>{s.notes}</p> : <p className="mute" style={{ margin: "6px 0 0" }}>No speaker notes.</p>}
                 </div>
               </div>
             ))}
@@ -160,6 +181,36 @@ export default function Classes() {
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
+  const [existing, setExisting] = useState<string | null>(null); // course id with the "existing class" form open
+  const [ex, setEx] = useState<{ number: number; topic: string; files: File[] }>({ number: 1, topic: "", files: [] });
+  const [progress, setProgress] = useState("");
+  const [exErr, setExErr] = useState("");
+
+  async function addExisting(courseId: string) {
+    setExErr("");
+    const r = await importAll(ex.files, setProgress);
+    setProgress("");
+    if (r.errors.length && !r.slides.length && !r.materials.length) return setExErr(r.errors.join(" "));
+    const firstTitle = r.slides.find((x) => x.title)?.title ?? "";
+    const l = {
+      id: uid(),
+      courseId,
+      number: ex.number,
+      topic: ex.topic.trim() || firstTitle || ex.files[0]?.name.replace(/\.[^.]+$/, "") || "Untitled class",
+      premise: "",
+      readings: [],
+      slides: r.slides,
+      materials: r.materials,
+      status: "ready" as const,
+      readyAt: new Date().toISOString(),
+    };
+    updateLessons((cur) => [...cur, l]);
+    if (r.errors.length) alert(r.errors.join("\n"));
+    setExisting(null);
+    setEx({ number: 1, topic: "", files: [] });
+    setOpen(l.id);
+    router.replace(`/classes?open=${l.id}`);
+  }
 
   useEffect(() => {
     setOpen(params.get("open"));
@@ -207,15 +258,34 @@ export default function Classes() {
                       updateLessons((cur) => cur.filter((l) => l.courseId !== c.id));
                       updateCourses((cur) => cur.filter((x) => x.id !== c.id));
                     }}>Delete</button>
-                    <Link className="btn sm" href={`/prep?new=1&course=${c.id}`}>+ Class</Link>
+                    <button className="btn sm" onClick={() => { setExisting(existing === c.id ? null : c.id); setEx({ number: Math.max(0, ...ls.map((l) => l.number)) + 1, topic: "", files: [] }); }}>+ existing class</button>
+                    <Link className="btn sm" href={`/prep?new=1&course=${c.id}`}>+ new class</Link>
                   </>
                 )}
               </div>
             </div>
+            {existing === c.id && (
+              <form className="existing" onSubmit={(e) => { e.preventDefault(); if (ex.files.length) addExisting(c.id); }}>
+                <p className="mute" style={{ margin: 0 }}>Bring in a class you’ve already taught. PowerPoint slides come in as editable slides (with speaker notes and pictures); PDFs and Word files are kept as class materials.</p>
+                <div className="row" style={{ alignItems: "end" }}>
+                  <div style={{ width: 90 }}><label className="label">class #</label><input className="input" type="number" min={1} value={ex.number} onChange={(e) => setEx({ ...ex, number: Number(e.target.value) || 1 })} /></div>
+                  <div className="grow"><label className="label">topic (or leave blank to use the first slide’s title)</label><input className="input" value={ex.topic} onChange={(e) => setEx({ ...ex, topic: e.target.value })} /></div>
+                </div>
+                <label className="drop drop-file" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); setEx({ ...ex, files: [...ex.files, ...Array.from(e.dataTransfer.files)] }); }}>
+                  <input type="file" multiple accept={ACCEPT} className="hide" onChange={(e) => setEx({ ...ex, files: [...ex.files, ...Array.from(e.target.files ?? [])] })} />
+                  {ex.files.length ? ex.files.map((f) => f.name).join(" · ") : "Drop your files here — PowerPoint (.pptx), PDF, Word (.docx), images — or click to choose"}
+                </label>
+                {exErr && <div className="err">{exErr}</div>}
+                <div className="row">
+                  <button className="btn solid" disabled={!ex.files.length || !!progress}>{progress || "add class"}</button>
+                  <button type="button" className="btn ghost" onClick={() => setExisting(null)}>cancel</button>
+                </div>
+              </form>
+            )}
             {ls.length ? (
               <div className="classrows">
                 {ls.map((l) => (
-                  <button key={l.id} className="classrow" onClick={() => { setOpen(l.id); router.replace(`/classes?open=${l.id}`); }}>
+                  <div key={l.id} className="classrow" role="link" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") { setOpen(l.id); router.replace(`/classes?open=${l.id}`); } }} onClick={() => { setOpen(l.id); router.replace(`/classes?open=${l.id}`); }}>
                     <span className="num serif">{pad(l.number)}</span>
                     <span className="thumb">{l.slides[0] ? <SlideView s={l.slides[0]} n={l.number} /> : <span className="slide"><span className="ph">no slides</span></span>}</span>
                     <span className="grow">
@@ -224,9 +294,10 @@ export default function Classes() {
                     </span>
                     <span className="mono mute meta">
                       <span className={`v ${l.status === "ready" ? "ok" : "todo"}`}>{l.status === "ready" ? "ready" : "in prep"}</span>
-                      <span>{l.slides.length} slides{l.research ? " · doc" : ""}</span>
+                      <span>{l.slides.length} slides{l.research ? " · doc" : ""}{l.materials?.length ? ` · ${l.materials.length} file(s)` : ""}</span>
+                      <Link className="btn sm" href={`/prep?lesson=${l.id}&improve=1`} onClick={(e) => e.stopPropagation()}>suggest improvements</Link>
                     </span>
-                  </button>
+                  </div>
                 ))}
               </div>
             ) : <div className="empty">No classes yet. <Link href={`/prep?new=1&course=${c.id}`}>Prepare the first one →</Link></div>}

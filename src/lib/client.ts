@@ -146,4 +146,4 @@ export const readAsBase64 = (file: File): Promise<string> =>
   });
 
 /** Route museum images through our proxy so they can be embedded in .pptx files. */
-export const proxied = (url: string) => (url.startsWith("data:") ? url : `/api/img?url=${encodeURIComponent(url)}`);
+export const proxied = (url: string) => (url.startsWith("data:") || url.startsWith("/") ? url : `/api/img?url=${encodeURIComponent(url)}`);

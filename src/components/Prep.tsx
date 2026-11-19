@@ -13,6 +13,7 @@ import { STARTER_RESOURCES } from "@/lib/starter";
 import { OTHER, pad, useStudio } from "@/lib/studio";
 import type { Artwork, Claim, Lesson, ResearchDoc, Resource, Slide } from "@/lib/types";
 import Claims from "./Claims";
+import Improve from "./Improve";
 import { ExhibitsPanel, FilesPanel, LibraryPanel, TextbookPanel } from "./Panels";
 import SlideView from "./SlideView";
 
@@ -187,7 +188,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
       <aside className="stack">
         <div className="card">
           <h2 style={{ marginBottom: 4 }}>Exhibits</h2>
-          <p className="mute" style={{ margin: "0 0 12px", fontSize: 13 }}>Suggested for this class and matched to the museum’s own record. Tick the ones to use in the slides.</p>
+          <p className="mute" style={{ margin: "0 0 12px", fontSize: 16 }}>Suggested for this class and matched to the museum’s own record. Tick the ones to use in the slides.</p>
           <div className="stack">
             {doc.exhibits.map((e) => (
               <div key={e.id} className="sugg">
@@ -200,7 +201,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
                         <b>{e.match.title}</b>
                       </label>
                       <div className="src">{e.match.artist.split("\n")[0]}{e.match.date && `, ${e.match.date}`}</div>
-                      {e.why && <div style={{ fontSize: 13, marginTop: 4 }}>{e.why}</div>}
+                      {e.why && <div style={{ fontSize: 16, marginTop: 4 }}>{e.why}</div>}
                       <div className="src"><a href={e.match.url} target="_blank" rel="noreferrer">{e.match.museum} ↗</a> · {e.match.publicDomain ? "public domain" : "rights: check"}</div>
                     </div>
                   </>
@@ -248,7 +249,10 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
   const setSlides = (fn: (s: Slide[]) => Slide[]) => set((l) => ({ ...l, slides: fn(l.slides) }));
   const setSlide = (id: string, fn: (s: Slide) => Slide) => setSlides((ss) => ss.map((s) => (s.id === id ? fn(s) : s)));
   const edit = (patch: Partial<Slide>) => slide && setSlide(slide.id, (s) => ({ ...s, ...patch, check: undefined }));
-  const chosen = (lesson.research?.exhibits ?? []).filter((e) => e.use && e.match).map((e) => e.match!);
+  const chosen = [...(lesson.research?.exhibits ?? []), ...(lesson.review?.exhibits ?? [])]
+    .filter((e) => e.use && e.match)
+    .map((e) => e.match!)
+    .filter((a, i, all) => all.findIndex((b) => b.url === a.url) === i);
   const books = resources.filter((r) => r.kind === "textbook");
 
   async function auto() {
@@ -300,7 +304,7 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
             {busy ? "Making slides… (1–2 min)" : lesson.slides.length ? "Remake from research" : "Make slides from research"}
           </button>
         </>
-      ) : <span className="mute" style={{ fontSize: 13 }}>No research yet — build slides by hand, or do Step 2 first.</span>}
+      ) : <span className="mute" style={{ fontSize: 16 }}>No research yet — build slides by hand, or do Step 2 first.</span>}
       <button className="btn ghost" onClick={() => { const s = blankSlide("text"); setSlides((x) => [...x, s]); setSel(s.id); }}>+ Blank slide</button>
     </div>
   );
@@ -341,8 +345,8 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
                 <div className="thumbs">
                   {slide.images.map((im, i) => (
                     <div key={i} className="t" title={im.credit}>
-                      <div className="photo"><img src={im.url.startsWith("data:") ? im.url : proxied(im.url)} alt="" /></div>
-                      <div className="mono" style={{ fontSize: 9, marginTop: 3 }}>{im.rights === "public-domain" ? "public domain" : im.rights === "own" ? "yours" : "rights: check"}</div>
+                      <div className="photo"><img src={proxied(im.url)} alt="" /></div>
+                      <div className="mono" style={{ fontSize: 12, marginTop: 3 }}>{im.rights === "public-domain" ? "public domain" : im.rights === "own" ? "yours" : "rights: check"}</div>
                       <button className="btn sm solid" onClick={() => setSlide(slide.id, (s) => ({ ...s, images: s.images.filter((_, j) => j !== i), artworks: s.artworks.filter((a) => caption(a) !== im.credit) }))} aria-label="Remove image">×</button>
                     </div>
                   ))}
@@ -477,7 +481,7 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
           {lesson.research && <button className="btn ghost" onClick={() => downloadDocx(lesson, course)}>Research document ↓</button>}
         </div>
         <div className="row">
-          {!r.ok && <span className="mute" style={{ fontSize: 13 }}>{r.problems ? "Fix the ✗ facts first." : r.unchecked ? "Run the fact-check first." : "Add slides first."}</span>}
+          {!r.ok && <span className="mute" style={{ fontSize: 16 }}>{r.problems ? "Fix the ✗ facts first." : r.unchecked ? "Run the fact-check first." : "Add slides first."}</span>}
           <button className="btn solid" disabled={!r.ok}
             onClick={() => {
               if (r.unverified && !confirm(`${r.unverified} slide(s) still have facts no source could confirm. You've checked these yourself?`)) return;
@@ -508,7 +512,7 @@ export default function Prep() {
     const want = params.get("lesson");
     if (params.get("new")) { setCreating(true); setStep(1); return; }
     const l = lessons.find((x) => x.id === want) ?? (!lessonId ? lessons.find((x) => x.status === "draft") : undefined);
-    if (l) { setLessonId(l.id); setStep(l.slides.length ? 3 : l.research ? 2 : l.premise ? 2 : 1); }
+    if (l) { setLessonId(l.id); setStep(params.get("improve") ? 2 : l.slides.length ? 3 : l.research ? 2 : l.premise ? 2 : 1); }
     else if (!lessonId) setCreating(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, params]);
@@ -536,8 +540,8 @@ export default function Prep() {
 
   if (!ready) return <main className="page"><p className="mute">Loading…</p></main>;
 
-  const steps: [Step, string][] = [[1, "Brief"], [2, "Research"], [3, "Slides"], [4, "Check & finish"]];
-  const done = (n: Step) => !!lesson && (n === 1 ? true : n === 2 ? !!lesson.research : n === 3 ? lesson.slides.length > 0 : lesson.status === "ready");
+  const steps: [Step, string][] = [[1, "Brief"], [2, "Research & ideas"], [3, "Slides"], [4, "Check & finish"]];
+  const done = (n: Step) => !!lesson && (n === 1 ? true : n === 2 ? !!(lesson.research || lesson.review) : n === 3 ? lesson.slides.length > 0 : lesson.status === "ready");
   const byCourse = courses.map((c) => ({ c, ls: lessons.filter((l) => l.courseId === c.id).sort((a, b) => a.number - b.number) })).filter((g) => g.ls.length);
 
   return (
@@ -572,12 +576,15 @@ export default function Prep() {
       </nav>
 
       {step === 1 && <Brief key={lesson?.id ?? `new-${params.get("course") ?? ""}`} lesson={lesson} preset={params.get("course")} onSave={saveBrief} />}
+      {lesson && step === 2 && (lesson.slides.length > 0 || (lesson.materials?.length ?? 0) > 0 || lesson.review) && (
+        <Improve key={lesson.id} lesson={lesson} course={course} set={set} autoRun={params.get("improve") === "1"} />
+      )}
       {lesson && step === 2 && <ResearchStep lesson={lesson} course={course} set={set} onNext={() => setStep(3)} />}
       {lesson && step === 3 && <SlidesStep lesson={lesson} course={course} set={set} resources={resources} onNext={() => setStep(4)} />}
       {lesson && step === 4 && <FinishStep lesson={lesson} course={course} set={set} />}
 
       {lesson && step === 1 && (
-        <p className="mute" style={{ fontSize: 13, marginTop: 14 }}>
+        <p className="mute" style={{ fontSize: 16, marginTop: 14 }}>
           Finished classes live in <Link href="/classes">Classes</Link>.{" "}
           <button className="linkish" onClick={() => { if (confirm(`Delete Class ${lesson.number}: ${lesson.topic}? This removes its research and slides.`)) { updateLessons((cur) => cur.filter((l) => l.id !== lesson.id)); setLessonId(null); setCreating(true); router.replace("/prep?new=1"); } }}>Delete this class</button>
         </p>

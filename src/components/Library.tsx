@@ -87,7 +87,7 @@ export default function Library() {
                 <div>
                   <h3>{r.url ? <a href={r.url} target="_blank" rel="noreferrer">{r.title} ↗</a> : r.title}</h3>
                   <div className="src">{[r.author, r.publisher].filter(Boolean).join(" · ")}</div>
-                  {r.notes && <p style={{ margin: "6px 0 0", fontSize: 14 }}>{r.notes}</p>}
+                  {r.notes && <p style={{ margin: "6px 0 0", fontSize: 17 }}>{r.notes}</p>}
                   <div className="row" style={{ marginTop: 8 }}>
                     {r.topics.map((t) => (
                       <button key={t} className="chip" onClick={() => setQ(t)}>{t}</button>

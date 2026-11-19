@@ -66,6 +66,36 @@ export type ResearchDoc = {
   exhibits: ExhibitSuggestion[];
 };
 
+export type Material = {
+  id: string;
+  name: string; // file name
+  kind: "pptx" | "pdf" | "docx" | "text" | "image";
+  fileId?: string; // full extracted text, kept in file storage (/api/file/<id>)
+  preview: string; // first few hundred characters
+  slides?: number; // slides imported from it (pptx)
+  at: string;
+};
+
+export type Suggestion = {
+  id: string;
+  kind: "accuracy" | "content" | "discussion" | "exhibit" | "structure" | "clarity";
+  slideId?: string; // which slide it is about, if any
+  text: string; // what to change and why
+  change?: { title?: string; body?: string; notes?: string }; // proposed new wording for that slide
+  newSlide?: { title: string; body: string; notes: string }; // or a slide to add after it
+  sources: Source[];
+  verified: boolean; // a factual suggestion with a retrieved source
+  status: "open" | "applied" | "dismissed";
+};
+
+export type ReviewDoc = {
+  at: string;
+  summary: string; // overall read of the class (opinion, no facts)
+  suggestions: Suggestion[];
+  questions: string[]; // new discussion points
+  exhibits: ExhibitSuggestion[];
+};
+
 export type Lesson = {
   id: string;
   courseId: string;
@@ -73,6 +103,8 @@ export type Lesson = {
   topic: string;
   premise: string; // her angle / what the class is about
   research?: ResearchDoc;
+  materials?: Material[]; // files she uploaded (her existing class materials)
+  review?: ReviewDoc; // "suggest improvements"
   readings: string[]; // resource ids
   slides: Slide[];
   status: "draft" | "ready";

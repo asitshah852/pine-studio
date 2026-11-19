@@ -3,7 +3,7 @@ import { proxied } from "@/lib/client";
 import { caption } from "@/lib/museum";
 import type { Slide } from "@/lib/types";
 
-const src = (u: string) => (u.startsWith("data:") ? u : proxied(u));
+const src = (u: string) => proxied(u);
 
 export default function SlideView({ s, n }: { s: Slide; n?: number }) {
   const bullets = s.body.split("\n").map((t) => t.trim()).filter(Boolean);

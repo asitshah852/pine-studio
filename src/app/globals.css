@@ -51,7 +51,7 @@ img { display: block; max-width: 100%; }
 
 /* ── page ── */
 .page { max-width: 1480px; margin: 0 auto; padding: 32px 28px 80px; }
-.head { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 28px; flex-wrap: wrap; }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 28px; flex-wrap: wrap; }
 .head h1 { font-family: var(--serif); font-weight: 400; font-size: 54px; line-height: 1; margin: 0; letter-spacing: -0.02em; }
 .head p { margin: 8px 0 0; color: var(--mute); max-width: 640px; }
 h2 { font-family: var(--serif); font-weight: 400; font-size: 30px; margin: 0 0 12px; letter-spacing: -0.01em; }
@@ -204,7 +204,7 @@ input.plain.h { font-family: var(--serif); font-size: 24px; }
 
 /* ── courses ── */
 .course { margin-bottom: 44px; }
-.coursehead { display: flex; justify-content: space-between; align-items: end; gap: 12px; border-bottom: 1px solid var(--ink); padding-bottom: 8px; flex-wrap: wrap; }
+.coursehead { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; border-bottom: 1px solid var(--ink); padding-bottom: 8px; flex-wrap: wrap; }
 .coursehead h2 { margin: 0; font-size: 34px; }
 .classrows { display: flex; flex-direction: column; }
 .classrow { display: flex; align-items: center; gap: 20px; padding: 14px 0; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; cursor: pointer; width: 100%; }
@@ -212,7 +212,7 @@ input.plain.h { font-family: var(--serif); font-size: 24px; }
 .classrow .num { font-size: 34px; width: 52px; color: var(--mute); }
 .classrow .thumb { width: 150px; flex: 0 0 150px; pointer-events: none; }
 .classrow .t { font-size: 18px; font-weight: 500; display: block; }
-.classrow .meta { display: flex; flex-direction: column; align-items: end; gap: 4px; white-space: nowrap; }
+.classrow .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; white-space: nowrap; }
 
 /* ── library ── */
 .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -363,3 +363,41 @@ h3 { font-weight: 500; }
   .side .foot { margin-top: 0; flex-direction: row; gap: 14px; flex-basis: 100%; }
   .page { padding: 18px 16px 60px; }
 }
+
+/* existing classes + suggest improvements */
+.existing { display: flex; flex-direction: column; gap: 14px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.improve { margin-bottom: 44px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+.mats { margin-top: 14px; }
+.mat { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.mattext { white-space: pre-wrap; font-family: var(--serif); font-size: 17px; line-height: 1.5; max-height: 420px; overflow: auto; background: var(--soft); padding: 14px; margin: 8px 0 0; }
+.sg { padding: 14px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.proposal { border-left: 1px solid var(--ink); padding: 4px 0 4px 14px; }
+details summary { cursor: pointer; }
+
+/* larger type (Asit, Nov 2026): everything about two points up */
+body { font-size: 20px; }
+.mono, .label { font-size: 17px; }
+.btn { font-size: 18px; }
+.btn.sm, .v, .strip .fr .n { font-size: 16px; }
+.src { font-size: 16px; }
+.chip { font-size: 17px; }
+.input, .select, .area { font-size: 19px; }
+.side nav a { font-size: 19px; }
+.side .sub a { font-size: 17px; }
+.side .mark { font-size: 20px; }
+.side .foot { font-size: 16px; }
+.head h1 { font-size: 38px; }
+.head p { font-size: 19px; }
+h2 { font-size: 28px; }
+.stepb { font-size: 20px; }
+.stepb .mono { font-size: 16px; }
+.dtab { font-size: 18px; }
+.doc .para p { font-size: 20px; }
+.doc .lead, .lead { font-size: 20px; }
+.doc .h, input.plain.h { font-size: 26px; }
+.ex, .sugg, .ex b { font-size: 17px; }
+.note, .err { font-size: 18px; }
+.classrow .t { font-size: 22px; }
+.coursehead h2 { font-size: 30px; }
+.item h3 { font-size: 19px; }
+.claims > div { font-size: 17px; }

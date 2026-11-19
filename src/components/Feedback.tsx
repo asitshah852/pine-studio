@@ -62,7 +62,7 @@ export default function Feedback() {
           <textarea className="area" style={{ minHeight: 160 }} value={text} onChange={(e) => { setText(e.target.value); setSent(""); }} placeholder="e.g. In Prep I want to see the textbook page next to the points…" />
           <button className="btn solid">Send</button>
           {sent && <span className="mono mute">{sent}</span>}
-          {st && !st.db && <p className="mute" style={{ fontSize: 12, margin: 0 }}>Notes are kept in this browser until shared saving is set up.</p>}
+          {st && !st.db && <p className="mute" style={{ fontSize: 15, margin: 0 }}>Notes are kept in this browser until shared saving is set up.</p>}
         </form>
       </div>
     </main>

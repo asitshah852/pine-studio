@@ -19,7 +19,7 @@ export async function PUT(req: Request, { params }: Ctx) {
   if (!passcodeOk(req)) return denied();
   if (!dbConfigured()) return Response.json({ shared: false });
   const text = await req.text();
-  if (text.length > 900_000) return Response.json({ error: "Too big to save in one go (own photos are large: use fewer or smaller ones)." }, { status: 413 });
+  if (text.length > 4_000_000) return Response.json({ error: "Too big to save in one go." }, { status: 413 });
   await db().set(K(name), JSON.parse(text));
   return Response.json({ shared: true });
 }

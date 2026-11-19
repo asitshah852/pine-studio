@@ -79,3 +79,33 @@ export function readiness(l: Lesson): { ok: boolean; problems: number; unverifie
 export function deckSources(slides: Slide[]): Source[] {
   return slides.reduce<Source[]>((acc, s) => addSources(acc, s.sources), []);
 }
+
+/** Apply one accepted suggestion: new wording for a slide, or an extra slide after it. */
+export function applySuggestion(slides: Slide[], s: import("./types").Suggestion): Slide[] {
+  let out = slides;
+  if (s.change && s.slideId) {
+    out = out.map((x) =>
+      x.id === s.slideId
+        ? {
+            ...x,
+            title: s.change!.title ?? x.title,
+            body: s.change!.body ?? x.body,
+            notes: s.change!.notes ?? x.notes,
+            sources: addSources(x.sources, s.sources),
+            check: undefined,
+          }
+        : x,
+    );
+  }
+  if (s.newSlide) {
+    const n: Slide = { ...blankSlide("text", s.newSlide.title), body: s.newSlide.body, notes: s.newSlide.notes, sources: s.sources };
+    const i = s.slideId ? out.findIndex((x) => x.id === s.slideId) : -1;
+    out = i >= 0 ? [...out.slice(0, i + 1), n, ...out.slice(i + 1)] : [...out, n];
+  }
+  return out;
+}
+
+/** A closing discussion slide from chosen questions. */
+export function discussionSlide(questions: string[]): Slide {
+  return { ...blankSlide("text", "Discuss"), body: questions.join("\n") };
+}

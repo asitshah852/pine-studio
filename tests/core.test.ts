@@ -70,3 +70,16 @@ test("dropping an artwork on a title slide turns it into an artwork slide", () =
   const s = addTo(blankSlide("title", "Intro"), { kind: "artwork", artwork: art() });
   assert.equal(s.layout, "artwork");
 });
+
+test("applying a suggestion rewrites the slide or adds one after it, and clears its check", async () => {
+  const { applySuggestion } = await import("../src/lib/slides");
+  const a = { ...blankSlide("text", "Old"), check: { at: "t", claims: [] } };
+  const b = blankSlide("text", "Next");
+  const base = { id: "s", kind: "content" as const, text: "x", sources: [{ title: "Src", url: "https://example.org/a" }], verified: true, status: "open" as const };
+  const changed = applySuggestion([a, b], { ...base, slideId: a.id, change: { title: "New" } });
+  assert.equal(changed[0].title, "New");
+  assert.equal(changed[0].check, undefined);
+  assert.equal(changed[0].sources.length, 1);
+  const added = applySuggestion([a, b], { ...base, slideId: a.id, newSlide: { title: "Extra", body: "p", notes: "n" } });
+  assert.deepEqual(added.map((s) => s.title), ["Old", "Extra", "Next"]);
+});

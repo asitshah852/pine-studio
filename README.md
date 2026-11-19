@@ -6,7 +6,7 @@ the dark mode. Works on laptop (prep) and phone (review).
 
 | Tab | What it does |
 |-----|--------------|
-| **01 Classes** | Courses (e.g. "Art Appreciation 103") with their classes by number and topic. Open a class: **Present** (full screen), **PowerPoint ↓**, **Document ↓** (research as Word), slides with speaker notes, research document, sources & readings. Add / rename / delete courses; delete classes. |
+| **01 Classes** | Courses (e.g. "Art Appreciation 103") with their classes by number and topic. **+ existing class** uploads materials she already has: PowerPoint (.pptx) becomes editable slides with notes and pictures; PDF, Word and text are kept as class materials. **suggest improvements** on every class opens it in Prep for a review: fact checks (sourced), specific changes she can apply or dismiss, new discussion points, exhibits from the museums. Open a class: **Present** (full screen), **PowerPoint ↓**, **Document ↓** (research as Word), slides with speaker notes, research document, sources & readings. Add / rename / delete courses; delete classes. |
 | **02 Prep** | Four steps. **1 Brief:** course, class #, topic, premise. **2 Research:** a 1–2 page document (every paragraph sourced or marked "?"), discussion questions, and suggested exhibits matched to real records at the Art Institute, the Met and Cleveland — tick the ones to use; edit or delete anything; download as Word. **3 Slides:** "Make slides from research" builds the deck (titles, short talking points, plain-language speaker notes, chosen exhibits placed); edit under each slide; add more exhibits, textbook points, her own images; drag frames to reorder. **4 Check & finish:** fact-check every slide, then **Ready for class →**. |
 | **03 Library** | Checked list of free and open resources plus City Colleges and Chicago Public Library access; "Find free" searches open libraries for any title. |
 | **04 Checker** | Paste text or drop screenshots/PDFs: each claim → ✓ / ? / ✗ with the page that backs it. |
@@ -41,6 +41,8 @@ src/lib/claude.ts    Claude calls (Opus 5.5, web search, source grounding, refus
 src/lib/prompts.ts   research (document + exhibits) · makeSlides · fromTextbook · factCheck
 src/lib/studio.ts    courses + classes (upgrades older saved data)
 src/lib/docx.ts      research document as Word
+src/lib/importers.ts upload: .pptx → slides; .pdf/.docx/.txt → materials (text kept in /api/file)
+src/components/Improve.tsx  materials + suggest improvements
 src/lib/museum.ts    AIC / Met / Cleveland open-access search + caption builder
 src/lib/slides.ts    slide building, drag-drop, fact-check state, readiness gate
 src/lib/pptx.ts      .pptx export in the browser (pptxgenjs)

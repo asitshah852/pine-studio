@@ -76,7 +76,7 @@ export default function Checker() {
           )}
           <div className="row">
             <button className="btn solid" disabled={busy || (!text.trim() && !ups.length) || st?.claude === false} onClick={run}>{busy ? "Checking… (1–2 min)" : "Check"}</button>
-            {st?.claude === false && <span className="mute" style={{ fontSize: 13 }}>Needs the Claude key (see SETUP.md).</span>}
+            {st?.claude === false && <span className="mute" style={{ fontSize: 16 }}>Needs the Claude key (see SETUP.md).</span>}
           </div>
           {err && <div className="err">{err}</div>}
           <div className="note">

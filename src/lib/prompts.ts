@@ -1,7 +1,7 @@
 // The three Claude jobs: research a topic, pull points from her textbook, fact-check text.
 import { ask, groundSources, parseJson } from "./claude";
 import { caption, findWork } from "./museum";
-import type { Artwork, Claim, ExhibitSuggestion, ResearchDoc, Slide, Source, TextbookPoint, Verdict } from "./types";
+import type { Artwork, Claim, ExhibitSuggestion, ResearchDoc, ReviewDoc, Slide, Source, Suggestion, TextbookPoint, Verdict } from "./types";
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 
@@ -218,4 +218,102 @@ Return ONLY JSON: { "claims": [ { "part": "the [id] the claim came from, or 'upl
         slideId: items.some((it) => it.id === part) ? part : undefined,
       };
     });
+}
+
+
+/** "Suggest improvements": review a class she has already taught (her slides + materials). */
+export async function review(input: {
+  course: string;
+  number: number;
+  topic: string;
+  premise: string;
+  slides: { id: string; title: string; body: string; notes: string }[];
+  materials: { name: string; text: string }[];
+}): Promise<ReviewDoc> {
+  const deck = input.slides
+    .map((s, i) => `[${s.id}] Slide ${i + 1}: ${s.title}\n${s.body}${s.notes ? `\nNotes: ${s.notes}` : ""}`)
+    .join("\n\n");
+  let budget = 60_000;
+  const mats = input.materials
+    .map((m) => {
+      const t = m.text.slice(0, Math.max(0, budget));
+      budget -= t.length;
+      return t ? `### ${m.name}\n${t}` : "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+  const { text, retrieved } = await ask({
+    system: `${HOUSE}
+Here you are reviewing a class she has ALREADY taught, as a helpful colleague. Respect her material and voice: suggest, don't rewrite everything. Opinions about teaching are fine and are never presented as facts. Any suggestion that states or corrects a FACT must carry a source you retrieved.`,
+    search: 8,
+    effort: "medium",
+    content: [
+      {
+        type: "text",
+        text: `Class ${input.number} of ${input.course || "the course"}: "${input.topic}".${input.premise ? ` Premise: ${input.premise}` : ""}
+
+HER SLIDES (ids in brackets):
+${deck || "(no slides)"}
+
+HER OTHER MATERIALS:
+${mats || "(none)"}
+
+Review it and return ONLY JSON (in a \`\`\`json block):
+{
+  "summary": "3–4 sentences: what works well and the biggest opportunities (opinion, no facts)",
+  "suggestions": [ {
+     "kind": "accuracy | content | discussion | exhibit | structure | clarity",
+     "slide": "slide id it concerns, or empty",
+     "text": "what to change and why, in plain language (1–3 sentences)",
+     "change": { "title": "new title or empty", "body": "new on-slide points, one per line, or empty", "notes": "new speaker notes or empty" },   // only when proposing new wording for that slide
+     "newSlide": { "title": "...", "body": "...", "notes": "..." },   // only when proposing an extra slide after that slide
+     "sources": [ { "title": "...", "url": "exact URL you retrieved" } ]   // required for accuracy fixes and any new facts
+  } ],   // 6–12 suggestions, most useful first; check her facts and flag anything wrong or outdated as "accuracy"
+  "questions": [ "new discussion point or question for students" ],   // 4–6
+  "exhibits": [ { "artist": "...", "title": "exact museum title", "date": "...", "why": "how it would strengthen this class" } ]   // 3–6, prefer the Art Institute of Chicago, The Met, Cleveland Museum of Art
+}`,
+      },
+    ],
+  });
+  type RawS = { kind?: string; slide?: string; text?: string; change?: { title?: string; body?: string; notes?: string }; newSlide?: { title?: string; body?: string; notes?: string }; sources?: { title?: string; url?: string }[] };
+  const raw = parseJson<{ summary?: string; suggestions?: RawS[]; questions?: string[]; exhibits?: { artist?: string; title?: string; date?: string; why?: string }[] }>(text);
+  const kinds = ["accuracy", "content", "discussion", "exhibit", "structure", "clarity"] as const;
+  const ids = new Set(input.slides.map((s) => s.id));
+  const clean = (o?: { title?: string; body?: string; notes?: string }) => {
+    if (!o) return undefined;
+    const r = { title: o.title?.trim() || undefined, body: o.body?.trim() || undefined, notes: o.notes?.trim() || undefined };
+    return r.title || r.body || r.notes ? r : undefined;
+  };
+  const suggestions: Suggestion[] = (raw.suggestions ?? [])
+    .filter((x) => x?.text)
+    .map((x) => {
+      const sources = groundSources(x.sources, retrieved);
+      const kind = (kinds as readonly string[]).includes(x.kind ?? "") ? (x.kind as Suggestion["kind"]) : "content";
+      const ns = clean(x.newSlide);
+      return {
+        id: rid(),
+        kind,
+        slideId: x.slide && ids.has(x.slide) ? x.slide : undefined,
+        text: String(x.text),
+        change: clean(x.change),
+        newSlide: ns ? { title: ns.title ?? "", body: ns.body ?? "", notes: ns.notes ?? "" } : undefined,
+        sources,
+        // A fact correction with no retrieved source can't be trusted.
+        verified: kind === "accuracy" ? sources.length > 0 : true,
+        status: "open" as const,
+      };
+    });
+  const exhibits: ExhibitSuggestion[] = await Promise.all(
+    (raw.exhibits ?? []).filter((e) => e?.title).slice(0, 6).map(async (e) => {
+      const match = await findWork(String(e.title), String(e.artist ?? ""));
+      return { id: rid(), suggested: `${e.artist ? `${e.artist}, ` : ""}${e.title}${e.date ? ` (${e.date})` : ""}`, why: String(e.why ?? ""), match, use: false };
+    }),
+  );
+  return {
+    at: new Date().toISOString(),
+    summary: String(raw.summary ?? ""),
+    suggestions,
+    questions: (raw.questions ?? []).filter((q) => typeof q === "string").slice(0, 8),
+    exhibits,
+  };
 }

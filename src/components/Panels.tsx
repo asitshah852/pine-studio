@@ -35,7 +35,7 @@ export function TextbookPanel({ books }: { books: Resource[] }) {
 
   return (
     <div className="stack">
-      <p className="mute" style={{ margin: 0, fontSize: 13 }}>Upload pages from your textbook (PDF or scan) or paste a passage. Points come only from those pages, with the page number and the exact words.</p>
+      <p className="mute" style={{ margin: 0, fontSize: 16 }}>Upload pages from your textbook (PDF or scan) or paste a passage. Points come only from those pages, with the page number and the exact words.</p>
       <div>
         <label className="label mono">Book</label>
         <input className="input" list="books" value={book} onChange={(e) => setBook(e.target.value)} />
@@ -104,7 +104,7 @@ export function ExhibitsPanel({ q, setQ, onAdd, addLabel = "+ Add" }: { q: strin
           <div key={`${a.museum}-${a.id}`} className="ex grab" draggable onDragStart={(e) => startDrag(e, { kind: "artwork", artwork: a })}>
             <div className="photo">
               {a.thumbUrl ? <img src={proxied(a.thumbUrl)} alt="" loading="lazy" /> : <div className="ph" style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>no image</div>}
-              <span className="rights mono" style={{ fontSize: 9 }}>{a.publicDomain ? "PD" : "©?"}</span>
+              <span className="rights mono" style={{ fontSize: 12 }}>{a.publicDomain ? "PD" : "©?"}</span>
             </div>
             <b>{a.title}</b>
             <span className="mute">{a.artist.split("\n")[0]}{a.date && `, ${a.date}`}</span>
@@ -116,7 +116,7 @@ export function ExhibitsPanel({ q, setQ, onAdd, addLabel = "+ Add" }: { q: strin
         ))}
       </div>
       {!busy && q && !shown.length && !errors.length && <div className="empty">No works found.</div>}
-      <p className="mute" style={{ fontSize: 12, margin: 0 }}>PD = public domain: full image goes into the deck. ©? = still in copyright: a small preview is used and flagged “rights: check” (classroom fair use is usually fine; posting online may not be).</p>
+      <p className="mute" style={{ fontSize: 15, margin: 0 }}>PD = public domain: full image goes into the deck. ©? = still in copyright: a small preview is used and flagged “rights: check” (classroom fair use is usually fine; posting online may not be).</p>
     </div>
   );
 }
@@ -132,7 +132,7 @@ export function FilesPanel() {
   }
   return (
     <div className="stack">
-      <p className="mute" style={{ margin: 0, fontSize: 13 }}>Your own photographs, scans or diagrams. Drop them here, then drag onto a slide.</p>
+      <p className="mute" style={{ margin: 0, fontSize: 16 }}>Your own photographs, scans or diagrams. Drop them here, then drag onto a slide.</p>
       <label className="drop drop-file" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); add(e.dataTransfer.files); }}>
         <input type="file" accept="image/*" multiple className="hide" onChange={(e) => add(e.target.files)} />
         Drop images, or click to choose
@@ -156,7 +156,7 @@ export function LibraryPanel({ lesson, resources, toggle }: { lesson: Lesson; re
   return (
     <div className="stack">
       <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter the library…" />
-      <p className="mute" style={{ margin: 0, fontSize: 13 }}>Tick to assign as a reading for this class. Drag to put it on a slide.</p>
+      <p className="mute" style={{ margin: 0, fontSize: 16 }}>Tick to assign as a reading for this class. Drag to put it on a slide.</p>
       {shown.map((r) => (
         <div key={r.id} className="point grab row" style={{ flexWrap: "nowrap", alignItems: "start" }} draggable
           onDragStart={(e) => startDrag(e, { kind: "text", heading: "Reading", text: `${r.title}${r.author ? ` — ${r.author}` : ""}`, sources: r.url ? [{ title: r.title, url: r.url }] : [], verified: true })}>
