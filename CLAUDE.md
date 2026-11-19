@@ -9,7 +9,8 @@
 
 ## The project
 - Name: **pine studio** (always lower case). Repo `asitshah852/pine-studio`, separate from other projects.
-- Tabs: Library · Classes · Prep · Checker · Feedback (see README.md).
+- Tabs (Asit, Nov 2026): Classes (by course) · Prep (1 Brief → 2 Research doc + questions + exhibits → 3 auto slides with talking points & plain-language speaker notes → 4 Check & finish) · Library · Checker · Feedback. See README.md.
+- Prep brief is just course, class number, topic and premise (no dates/units).
 - Design: minimalist black & white, photographic (Instrument Serif / Inter / JetBrains Mono,
   grayscale thumbnails that turn colour on hover, film-strip slide sorter, "Darkroom" dark mode).
   Only ✗ errors get colour (safelight red).

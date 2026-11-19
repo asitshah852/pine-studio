@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { groundSources, normUrl, parseJson } from "../src/lib/claude";
-import { caption } from "../src/lib/museum";
+import { caption, isMatch } from "../src/lib/museum";
 import { addTo, blankSlide, deckSources, readiness, slideFrom, slideState } from "../src/lib/slides";
 import type { Artwork, Lesson } from "../src/lib/types";
 
@@ -46,7 +46,7 @@ test("any edit clears the check; ready needs every slide checked and no errors",
   assert.equal(slideState(checked), "ok");
   const edited = addTo(checked, { kind: "text", text: "new fact", sources: [], verified: false });
   assert.equal(slideState(edited), "unchecked");
-  const lesson = (slides: Lesson["slides"]): Lesson => ({ id: "l", number: 1, topic: "t", summary: "", readings: [], status: "draft", slides });
+  const lesson = (slides: Lesson["slides"]): Lesson => ({ id: "l", courseId: "c", number: 1, topic: "t", premise: "", readings: [], status: "draft", slides });
   assert.equal(readiness(lesson([edited])).ok, false);
   const bad = { ...checked, check: { at: "t", claims: [{ text: "x", verdict: "contradicted" as const, sources: [] }] } };
   assert.equal(readiness(lesson([checked, bad])).problems, 1);
@@ -57,4 +57,16 @@ test("deck sources are de-duplicated", () => {
   const a = slideFrom({ kind: "artwork", artwork: art() });
   const b = slideFrom({ kind: "artwork", artwork: art() });
   assert.equal(deckSources([a, b]).length, 1);
+});
+
+test("suggested works only attach to a matching museum record", () => {
+  const rec = art({ title: "A Sunday on La Grande Jatte — 1884", artist: "Georges Seurat\nFrench, 1859–1891" });
+  assert.equal(isMatch(rec, "A Sunday on La Grande Jatte", "Georges Seurat"), true);
+  assert.equal(isMatch(rec, "A Sunday on La Grande Jatte", "Paul Signac"), false);
+  assert.equal(isMatch(rec, "Nighthawks", "Georges Seurat"), false);
+});
+
+test("dropping an artwork on a title slide turns it into an artwork slide", () => {
+  const s = addTo(blankSlide("title", "Intro"), { kind: "artwork", artwork: art() });
+  assert.equal(s.layout, "artwork");
 });

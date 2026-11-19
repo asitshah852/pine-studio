@@ -1,14 +1,16 @@
 // Example classes so the prototype isn't empty. Labelled "Example" in the app; they contain
 // discussion prompts only (no factual claims), so there's nothing unsourced in them.
-import type { Lesson } from "./types";
+import type { Course, Lesson } from "./types";
+
+export const SEED_COURSES: Course[] = [{ id: "course-example", name: "Art Appreciation (example)", example: true }];
 
 export const SEED_LESSONS: Lesson[] = [
   {
     id: "example-1",
+    courseId: "course-example",
     number: 1,
     topic: "How to look at a work of art",
-    unit: "Foundations",
-    summary: "Slow looking: describe, analyse, interpret, judge.",
+    premise: "Slow looking: describe, analyse, interpret, judge.",
     readings: ["starter-1"],
     status: "ready",
     readyAt: "2026-11-19T00:00:00.000Z",
@@ -21,10 +23,10 @@ export const SEED_LESSONS: Lesson[] = [
   },
   {
     id: "example-2",
+    courseId: "course-example",
     number: 2,
     topic: "Photography: document or art?",
-    unit: "Photography",
-    summary: "Draft: research, exhibits and slides still to add.",
+    premise: "When does a photograph stop being a record and become art?",
     readings: [],
     status: "draft",
     example: true,

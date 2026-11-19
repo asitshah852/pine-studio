@@ -5,9 +5,9 @@ import { useEffect, useState } from "react";
 import { getPass, load, save, setPass, useStatus } from "@/lib/client";
 
 const TABS = [
-  ["/library", "Library"],
   ["/classes", "Classes"],
   ["/prep", "Prep"],
+  ["/library", "Library"],
   ["/checker", "Checker"],
   ["/feedback", "Feedback"],
 ] as const;
@@ -54,7 +54,7 @@ export default function Nav() {
         </form>
       )}
       <header className="bar">
-        <Link href="/prep" className="mark">
+        <Link href="/classes" className="mark">
           pine <i>studio</i>
         </Link>
         <nav className="tabs" aria-label="Sections">

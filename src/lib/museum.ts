@@ -119,3 +119,41 @@ export function caption(a: Artwork): string {
 
 // Hosts the image proxy will fetch from (so slides can embed museum images in .pptx).
 export const IMAGE_HOSTS = ["artic.edu", "www.artic.edu", "images.metmuseum.org", "collectionapi.metmuseum.org", "openaccess-cdn.clevelandart.org"];
+
+// ── Matching a suggested work ("Artist, Title (date)") to a real museum record ──
+const STOP = new Set(["the", "a", "an", "of", "and", "in", "on", "at", "la", "le", "les", "de", "du", "des", "el", "with", "to", "for"]);
+const words = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !STOP.has(w));
+
+/** True when the record's title covers most of the suggested title and the artist's surname matches. */
+export function isMatch(rec: Artwork, title: string, artist: string): boolean {
+  const want = words(title);
+  if (!want.length) return false;
+  const have = new Set(words(rec.title));
+  const hit = want.filter((w) => have.has(w)).length / want.length;
+  if (hit < 0.6) return false;
+  const surname = words(artist).pop();
+  if (!surname || /unknown|anonymous/.test(artist.toLowerCase())) return true;
+  return words(rec.artist).includes(surname);
+}
+
+/** Look a suggestion up in Chicago, then the Met, then Cleveland. Returns the first good match. */
+export async function findWork(title: string, artist: string): Promise<Artwork | undefined> {
+  const q = `${title} ${artist}`.trim();
+  const tries: (() => Promise<Artwork[]>)[] = [() => searchAIC(q, 8), () => searchMet(q, 4), () => searchCleveland(q, 6)];
+  for (const t of tries) {
+    try {
+      const hit = (await t()).find((r) => isMatch(r, title, artist));
+      if (hit) return hit;
+    } catch {
+      /* try the next museum */
+    }
+  }
+  return undefined;
+}

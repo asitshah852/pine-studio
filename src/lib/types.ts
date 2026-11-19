@@ -46,19 +46,43 @@ export type Slide = {
   check?: { at: string; claims: Claim[] };
 };
 
+export type Course = { id: string; name: string; example?: boolean };
+
+export type Paragraph = { id: string; text: string; sources: Source[]; verified: boolean; edited?: boolean };
+
+export type ExhibitSuggestion = {
+  id: string;
+  suggested: string; // what research suggested, e.g. "Georges Seurat, A Sunday on La Grande Jatte (1884)"
+  why: string; // why it fits the class (a teaching suggestion, not a fact)
+  match?: Artwork; // the museum record it matched, if found in an open collection
+  use: boolean; // her choice: use in the slides
+};
+
+export type ResearchDoc = {
+  at: string;
+  overview: string; // framing, no facts
+  sections: { id: string; heading: string; paragraphs: Paragraph[] }[];
+  questions: string[];
+  exhibits: ExhibitSuggestion[];
+};
+
 export type Lesson = {
   id: string;
-  number: number; // class / week number
-  date?: string; // yyyy-mm-dd
+  courseId: string;
+  number: number; // class number within the course
   topic: string;
-  unit?: string; // e.g. "Renaissance", "Photography"
-  summary: string;
+  premise: string; // her angle / what the class is about
+  research?: ResearchDoc;
   readings: string[]; // resource ids
   slides: Slide[];
   status: "draft" | "ready";
   readyAt?: string;
   checkedAt?: string;
   example?: boolean;
+  // older fields (kept so saved data still loads)
+  date?: string;
+  unit?: string;
+  summary?: string;
 };
 
 export type ResourceKind = "textbook" | "journal" | "paper" | "museum" | "website" | "video" | "other";
@@ -75,15 +99,6 @@ export type Resource = {
   notes: string;
   starter?: boolean; // from the starter list: confirm the edition she assigns
   addedAt: string;
-};
-
-export type Research = {
-  topic: string;
-  at: string;
-  overview: string;
-  points: { heading: string; text: string; sources: Source[]; verified: boolean }[];
-  artworks: string[]; // suggested works to look up in Exhibits
-  questions: string[]; // discussion questions for class
 };
 
 export type TextbookPoint = { text: string; quote?: string; page?: string };

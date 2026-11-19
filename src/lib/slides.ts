@@ -31,6 +31,7 @@ export function addTo(slide: Slide, item: DragItem): Slide {
       s.images = [...s.images, { url: a.thumbUrl.replace("/full/400,/", "/full/843,/"), credit: caption(a), rights: "check" }];
     s.sources = addSources(s.sources, [{ title: `${a.museum}: ${a.title}`, url: a.url }]);
     if (!s.title) s.title = a.title;
+    if (s.layout === "title" || s.layout === "text") s.layout = "artwork";
     if (s.artworks.length >= 2 && s.layout === "artwork") s.layout = "compare";
     return s;
   }

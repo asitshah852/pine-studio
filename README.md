@@ -6,11 +6,11 @@ the dark mode. Works on laptop (prep) and phone (review).
 
 | Tab | What it does |
 |-----|--------------|
-| **01 Library** | Textbooks, journals, papers, museums, websites. Starts with a checked list of **free and open** resources (open textbooks, Smarthistory, the Met's Heilbrunn Timeline, Getty and Met free books, Artstor public collections, AIC/NGA/LOC open images) plus **City Colleges of Chicago** library and **Chicago Public Library** access. "Find free" searches Open Textbook Library, OER Commons, Internet Archive, JSTOR, CPL and WorldCat for any title. Add / edit / filter. |
-| **02 Classes** | Finished, fact-checked classes grouped by unit: slide contact sheet, **Present** (full screen, arrow keys), **Download .pptx**, readings, every source. Send back to Prep to change. |
-| **03 Prep** | The workbench for the next class. Left drawer: **Research** (Claude + web search; every fact keeps its source page), **Textbook** (upload pages or paste a passage → points with page number and exact quote), **Exhibits** (Art Institute of Chicago, The Met, Cleveland Museum of Art open-access search), **Library** (assign readings), **My images** (her own photos). **Drag anything onto the slide or the film strip.** Edit title, points, notes, layout (title / text / artwork / compare). **Fact-check deck**, then **Ready for class →** moves it to Classes. |
-| **04 Checker** | Paste text or drop screenshots/PDFs (e.g. a deck saved as PDF, a handout): every factual claim → ✓ supported / ? unverified / ✗ wrong + fix, each with the page that backs it. |
-| **05 Feedback** | Tanya's change requests per tab, ticked off when done; optionally emailed. |
+| **01 Classes** | Courses (e.g. "Art Appreciation 103") with their classes by number and topic. Open a class: **Present** (full screen), **PowerPoint ↓**, **Document ↓** (research as Word), slides with speaker notes, research document, sources & readings. Add / rename / delete courses; delete classes. |
+| **02 Prep** | Four steps. **1 Brief:** course, class #, topic, premise. **2 Research:** a 1–2 page document (every paragraph sourced or marked "?"), discussion questions, and suggested exhibits matched to real records at the Art Institute, the Met and Cleveland — tick the ones to use; edit or delete anything; download as Word. **3 Slides:** "Make slides from research" builds the deck (titles, short talking points, plain-language speaker notes, chosen exhibits placed); edit under each slide; add more exhibits, textbook points, her own images; drag frames to reorder. **4 Check & finish:** fact-check every slide, then **Ready for class →**. |
+| **03 Library** | Checked list of free and open resources plus City Colleges and Chicago Public Library access; "Find free" searches open libraries for any title. |
+| **04 Checker** | Paste text or drop screenshots/PDFs: each claim → ✓ / ? / ✗ with the page that backs it. |
+| **05 Feedback** | Tanya's change requests per tab, ticked off when done. |
 
 ## Ground rules (fact-checking)
 - **Nothing is made up.** Claude writes framing, outlines and questions; facts must come with a
@@ -38,7 +38,9 @@ the browser). Research, Textbook and Checker need `ANTHROPIC_API_KEY`. See **SET
 ## Code map
 ```
 src/lib/claude.ts    Claude calls (Opus 5.5, web search, source grounding, refusal fallback)
-src/lib/prompts.ts   research · fromTextbook · factCheck
+src/lib/prompts.ts   research (document + exhibits) · makeSlides · fromTextbook · factCheck
+src/lib/studio.ts    courses + classes (upgrades older saved data)
+src/lib/docx.ts      research document as Word
 src/lib/museum.ts    AIC / Met / Cleveland open-access search + caption builder
 src/lib/slides.ts    slide building, drag-drop, fact-check state, readiness gate
 src/lib/pptx.ts      .pptx export in the browser (pptxgenjs)

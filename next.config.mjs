@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   async redirects() {
-    return [{ source: "/", destination: "/prep", permanent: false }];
+    return [{ source: "/", destination: "/classes", permanent: false }];
   },
 };
 

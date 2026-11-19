@@ -3,7 +3,7 @@ import { useState } from "react";
 import { api, uid, useCollection, useStatus } from "@/lib/client";
 import type { FeedbackItem } from "@/lib/types";
 
-const TABS = ["Library", "Classes", "Prep", "Checker", "Feedback", "Look & feel", "Something new"];
+const TABS = ["Classes", "Prep", "Library", "Checker", "Feedback", "Look & feel", "Something new"];
 
 export default function Feedback() {
   const { items, update } = useCollection<FeedbackItem>("feedback", []);

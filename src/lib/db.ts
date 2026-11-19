@@ -10,4 +10,4 @@ let r: Redis | null = null;
 export const db = () => (r ??= new Redis({ url: url!, token: token! }));
 export const K = (name: string) => `pine:${name}`;
 
-export const COLLECTIONS = ["resources", "lessons", "feedback", "research"] as const;
+export const COLLECTIONS = ["courses", "resources", "lessons", "feedback", "research"] as const;

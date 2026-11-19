@@ -5,6 +5,7 @@ import { proxied } from "./client";
 import { caption } from "./museum";
 import { deckSources } from "./slides";
 import type { Lesson, SlideImage } from "./types";
+// (title is "Class N: topic")
 
 const W = 13.333;
 const H = 7.5;
