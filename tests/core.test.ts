@@ -194,3 +194,17 @@ test("finds the PDF download link on a book's page", async () => {
   assert.deepEqual(pdfLinks(bepress, "https://oer.galileo.usg.edu/arts-textbooks/3"), ["https://oer.galileo.usg.edu/cgi/viewcontent.cgi?article=1002&context=arts-textbooks"]);
   assert.deepEqual(nextPages(`<a href="/download/9">Download this book</a>`, "https://a.edu/x"), ["https://a.edu/download/9"]);
 });
+
+test("research picks the textbook pages that match the topic", async () => {
+  const { bestPages } = await import("../src/lib/textbooks");
+  const filler = " The figure stands against a plain ground.".repeat(8);
+  const all = [
+    `--- Page 1 ---\nPreface and acknowledgements.${filler}`,
+    `--- Page 2 ---\nImpressionism began in Paris; Monet painted light and atmosphere outdoors. Impressionism changed painting.${filler}`,
+    `--- Page 3 ---\nPhotography arrived in 1839 and painters such as Degas used photographs.${filler}`,
+  ].join("\n\n");
+  const top = bestPages(all, "Impressionism and the camera: how photography changed painting");
+  assert.equal(top[0].page, 2);
+  assert.ok(top.some((p) => p.page === 3));
+  assert.ok(!top.some((p) => p.page === 1));
+});

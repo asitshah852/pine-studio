@@ -1,11 +1,12 @@
 "use client";
 // The class-making steps, shared by the step-by-step buttons and the one-click "make my class".
 // Each request carries a job key, so a result that finishes after the page closed is picked up later.
-import { api } from "./client";
+import { api, load } from "./client";
+import { textbookExcerpts } from "./textbooks";
 import { forget } from "./jobs";
 import { withCheck, withResearch, withSlides } from "./lessonOps";
 import { checkItems } from "./slides";
-import type { Claim, Lesson, ResearchDoc, Slide } from "./types";
+import type { Claim, Lesson, ResearchDoc, Resource, Slide } from "./types";
 
 type Set = (fn: (l: Lesson) => Lesson) => void;
 
@@ -14,7 +15,10 @@ export const slideCount = (minutes?: number) => (!minutes ? 12 : minutes <= 50 ?
 
 export async function runResearch(l: Lesson, course: string, set: Set): Promise<ResearchDoc> {
   const key = `research:${l.id}`;
-  const r = await api<ResearchDoc>("/api/research", { method: "POST", body: JSON.stringify({ topic: l.topic, premise: l.premise, course, minutes: l.minutes, jobKey: key }) });
+  // Her stored textbooks: the pages that best match the topic go along as a source.
+  const books = load<Resource[]>("pine.resources", []);
+  const excerpts = await textbookExcerpts(`${l.topic} ${l.premise}`, books).catch(() => []);
+  const r = await api<ResearchDoc>("/api/research", { method: "POST", body: JSON.stringify({ topic: l.topic, premise: l.premise, course, minutes: l.minutes, excerpts, jobKey: key }) });
   set((x) => withResearch(x, r));
   forget(key);
   return r;

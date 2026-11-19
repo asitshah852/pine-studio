@@ -136,7 +136,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
       <div className="card stack" style={{ maxWidth: 720 }}>
         <h2>Research</h2>
         <p style={{ margin: 0 }}>
-          Writes a 1–2 page document on <b>{lesson.topic}</b> from museum, Smarthistory and scholarly pages, with discussion questions and
+          Writes a 1–2 page document on <b>{lesson.topic}</b> from your stored textbooks (cited by page) and museum, Smarthistory and scholarly pages, with discussion questions and
           suggested exhibits looked up in the Art Institute, the Met and Cleveland. Every fact keeps its source; anything unsourced is marked “?”.
         </p>
         {lesson.premise && <p className="mute" style={{ margin: 0 }}>Premise: {lesson.premise}</p>}
@@ -145,7 +145,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
           <button className="btn ghost" onClick={onNext}>Skip — make slides by hand</button>
           <Versions lesson={lesson} kind="research" set={set} />
         </div>
-        {busy && <Working since={job.started} what="Researching" doing="Searching museum, Smarthistory and scholarly pages, writing the document, then matching exhibits to museum records" usual="2–3 minutes" />}
+        {busy && <Working since={job.started} what="Researching" doing="Reading the matching pages of your stored textbooks, searching museum, Smarthistory and scholarly pages, writing the document, then matching exhibits" usual="2–3 minutes" />}
         {st?.claude === false && <div className="note">Research is off until the Claude key is added in Vercel.</div>}
         {err && <div className="err">{err}</div>}
       </div>

@@ -200,7 +200,7 @@ export default function Library() {
                 )}
                 {openFind === r.id && (
                   <div className="find">
-                    <span className="mute">find a free copy:</span>
+                    <span className="mute">find in a library:</span>
                     {findLinks(r.title, r.author).map((l) => (
                       <a key={l.label} href={l.url} target="_blank" rel="noreferrer">{l.label}</a>
                     ))}
@@ -208,8 +208,10 @@ export default function Library() {
                 )}
               </div>
               <div className="lib-actions">
-                {(r.kind === "textbook" || r.kind === "journal" || r.kind === "paper") && (
-                  <button className="btn sm ghost" onClick={() => setOpenFind(openFind === r.id ? null : r.id)}>{openFind === r.id ? "hide" : "find a free copy"}</button>
+                {(r.kind === "textbook" || r.kind === "journal") && !isFreeBook(r) && !r.pdf && (
+                  <button className="btn sm ghost" onClick={() => setOpenFind(openFind === r.id ? null : r.id)} title="Search the Chicago Public Library, Internet Archive lending, JSTOR and WorldCat">
+                    {openFind === r.id ? "hide" : "find in a library"}
+                  </button>
                 )}
                 {(r.kind === "textbook" || r.kind === "journal" || r.kind === "paper") && !r.pdf && (
                   <button className="btn sm ghost" onClick={() => { setPdfFor(r.id); setPdfErr(""); setPdfFile(null); setPdfLink(r.url ?? ""); }}>{isFreeBook(r) ? "save a PDF copy" : "add a PDF"}</button>

@@ -12,7 +12,12 @@ Rules you never break:
 - If you can't source something, leave it out or mark it unverified. Never fill a gap with a plausible guess.
 - Write for 18–20 year-old non-majors: plain, vivid, no jargon without a one-line explanation.`;
 
-export async function research(topic: string, premise: string, course: string, minutes?: number): Promise<ResearchDoc> {
+export type Excerpt = { book: string; path: string; page: number; text: string; url: string };
+
+export async function research(topic: string, premise: string, course: string, minutes?: number, pages: Excerpt[] = []): Promise<ResearchDoc> {
+  const textbook = pages.length
+    ? `\n\nHER COURSE TEXTBOOKS — pages from her own stored copies that match this topic. Use them where relevant (students have these books), alongside the web. To cite one, put { "textbook": N } in that paragraph's sources.\n${pages.map((p, i) => `[textbook ${i + 1}] ${p.book}, PDF page ${p.page}:\n${p.text}`).join("\n\n")}`
+    : "";
   const { text, retrieved } = await ask({
     system: HOUSE,
     search: 12,
@@ -23,12 +28,12 @@ export async function research(topic: string, premise: string, course: string, m
         text: `Write the research document for a class in "${course || "Art Appreciation"}".
 Topic: "${topic}".${premise ? `\nHer premise / angle: ${premise}` : ""}${minutes ? `\nThe class is ${minutes} minutes long.` : ""}
 
-The document is 1–2 pages (about 700–1,000 words) that she can teach from and keep: clear sections, plain language, every factual sentence sourced.
+The document is 1–2 pages (about 700–1,000 words) that she can teach from and keep: clear sections, plain language, every factual sentence sourced.${textbook}
 
 Return ONLY a JSON object (in a \`\`\`json block):
 {
   "overview": "2–3 sentence framing of the class for students (no facts that need a source)",
-  "sections": [ { "heading": "section heading", "paragraphs": [ { "text": "2–4 sentences of sourced fact", "sources": [ { "title": "page title", "url": "exact URL you retrieved" } ] } ] } ],   // 4–6 sections, 1–3 paragraphs each
+  "sections": [ { "heading": "section heading", "paragraphs": [ { "text": "2–4 sentences of sourced fact", "sources": [ { "title": "page title", "url": "exact URL you retrieved" } or { "textbook": N } ] } ] } ],   // 4–6 sections, 1–3 paragraphs each
   "questions": [ "open discussion question" ],   // 4–6, no facts needed
   "exhibits": [ { "type": "artwork | photograph | video", "artist": "artist name (for a video: the artist or channel)", "title": "exact title of the work or video", "date": "date", "why": "one sentence on why it fits this class" } ]   // 6–10 things to show; for art prefer works in the Art Institute of Chicago, The Met or the Cleveland Museum of Art and use the museum's own title; historic photographs can come from the Library of Congress; for music, film or performance topics include official videos (they are looked up on YouTube)
 }`,
@@ -37,7 +42,7 @@ Return ONLY a JSON object (in a \`\`\`json block):
   });
   type Raw = {
     overview?: string;
-    sections?: { heading?: string; paragraphs?: { text?: string; sources?: { title?: string; url?: string }[] }[] }[];
+    sections?: { heading?: string; paragraphs?: { text?: string; sources?: { title?: string; url?: string; textbook?: number }[] }[] }[];
     questions?: string[];
     exhibits?: { type?: string; artist?: string; title?: string; date?: string; why?: string }[];
   };
@@ -50,7 +55,13 @@ Return ONLY a JSON object (in a \`\`\`json block):
       paragraphs: (s.paragraphs ?? [])
         .filter((p) => p?.text)
         .map((p) => {
-          const sources = groundSources(p.sources, retrieved);
+          const web = groundSources(p.sources?.filter((x) => !x?.textbook), retrieved);
+          // Pages from her own textbooks are real sources too (she can open them at that page).
+          const books = (p.sources ?? [])
+            .map((x) => (x?.textbook ? pages[Number(x.textbook) - 1] : undefined))
+            .filter((x): x is Excerpt => !!x)
+            .map((x) => ({ title: `${x.book}, PDF p. ${x.page}`, url: x.url }));
+          const sources = [...books, ...web];
           return { id: rid(), text: String(p.text), sources, verified: sources.length > 0 };
         }),
     }));
