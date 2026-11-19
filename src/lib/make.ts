@@ -39,11 +39,12 @@ export async function runCheck(l: Lesson, set: Set, all = false): Promise<void> 
   const at = new Date().toISOString();
   if (!items.length) return set((x) => withCheck(x, { claims: [], at }, ids));
   const key = `check:${l.id}`;
-  const res = await api<{ claims: Claim[]; at: string }>("/api/check", { method: "POST", body: JSON.stringify({ items, jobKey: key }) });
+  const res = await api<{ claims: Claim[]; at: string; checked?: string[] }>("/api/check", { method: "POST", body: JSON.stringify({ items, jobKey: key }) });
+  const done = new Set(res.checked ?? ids);
   // Only mark slides that haven't been edited again while the check ran.
   const sent = new Map(targets.map((t) => [t.id, JSON.stringify([t.title, t.body, t.notes])]));
   set((x) => {
-    const still = ids.filter((id) => {
+    const still = ids.filter((id) => done.has(id)).filter((id) => {
       const s = x.slides.find((y) => y.id === id);
       return s && sent.get(id) === JSON.stringify([s.title, s.body, s.notes]);
     });

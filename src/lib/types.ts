@@ -10,6 +10,7 @@ export type Claim = {
   sources: Source[];
   fix?: string; // suggested correction when contradicted
   slideId?: string;
+  confirmed?: boolean; // she checked it herself
 };
 
 export type Artwork = {

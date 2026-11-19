@@ -162,3 +162,15 @@ test("YouTube results become linked video exhibits, never treated as free images
   assert.equal(s.images[0].rights, "check");
   assert.equal(s.images[0].url, "https://i.ytimg.com/vi/abc123/hqdefault.jpg");
 });
+
+test("'I've checked this' turns an unverified fact into a confirmed one, and back", async () => {
+  const { confirmClaim } = await import("../src/lib/lessonOps");
+  const sl = { ...blankSlide("text", "A"), body: "x", check: { at: "t", claims: [{ text: "fact", verdict: "unverified" as const, sources: [] }] } };
+  const l0: import("../src/lib/types").Lesson = { id: "l", courseId: "c", number: 1, topic: "t", premise: "", readings: [], slides: [sl], status: "draft" };
+  assert.equal(readiness(l0).unverified, 1);
+  const l1 = confirmClaim(l0, sl.id, 0, true);
+  assert.equal(l1.slides[0].check?.claims[0].confirmed, true);
+  assert.equal(readiness(l1).unverified, 0);
+  assert.equal(readiness(l1).ok, true);
+  assert.equal(confirmClaim(l1, sl.id, 0, false).slides[0].check?.claims[0].verdict, "unverified");
+});

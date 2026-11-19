@@ -100,3 +100,15 @@ export function undoChat(l: Lesson, msgId: string): Lesson {
   if (!m?.undo) return l;
   return { ...l, slides: m.undo.slides, research: m.undo.research, chat: (l.chat ?? []).map((x) => (x.id === msgId ? { ...x, undo: undefined, undone: true } : x)) };
 }
+
+/** "I've checked this": she vouches for an unverified fact (or takes that back). */
+export function confirmClaim(l: Lesson, slideId: string, index: number, ok: boolean): Lesson {
+  return {
+    ...l,
+    slides: l.slides.map((s) =>
+      s.id === slideId && s.check
+        ? { ...s, check: { ...s.check, claims: s.check.claims.map((c, i) => (i === index ? { ...c, verdict: ok ? "supported" : "unverified", confirmed: ok || undefined } : c)) } }
+        : s,
+    ),
+  };
+}

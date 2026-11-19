@@ -8,7 +8,7 @@ import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
 import { recover, runJob, useJob } from "@/lib/jobs";
 import { makeClass, runCheck, runResearch, runSlides, slideCount } from "@/lib/make";
-import { restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
+import { confirmClaim, restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
 import { caption } from "@/lib/museum";
 import { downloadPptx } from "@/lib/pptx";
 import { addTo, blankSlide, checkItems, readiness, slideFrom, slideState } from "@/lib/slides";
@@ -407,7 +407,9 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
               {slide.notes && (
                 <div><label className="label mono">notes from your deck</label><textarea className="area" rows={3} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })} /></div>
               )}
-              {slide.check && slide.check.claims.some((c) => c.verdict !== "supported") && <Claims claims={slide.check.claims.filter((c) => c.verdict !== "supported")} />}
+              {slide.check && slide.check.claims.some((c) => c.verdict !== "supported" || c.confirmed) && (
+                <Claims claims={slide.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, slide.id, ci, ok))} />
+              )}
               <Src sources={slide.sources} />
               <div className="row">
                 <button className="btn sm ghost" onClick={() => { const c = { ...slide, id: uid(), check: undefined }; setSlides((x) => { const i = x.findIndex((y) => y.id === slide.id); const n = [...x]; n.splice(i + 1, 0, c); return n; }); setSel(c.id); }}>Duplicate</button>
@@ -482,6 +484,10 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
   const [pptx, setPptx] = useState(false);
   const [err, setErr] = useState("");
   const r = readiness(lesson);
+  const nums = (pred: (st: ReturnType<typeof slideState>) => boolean) => lesson.slides.map((x, i) => (pred(slideState(x)) ? i + 1 : 0)).filter(Boolean);
+  const uncheckedNums = nums((x) => x === "unchecked");
+  const problemNums = nums((x) => x === "problem");
+  const list = (ns: number[]) => (ns.length > 4 ? `${ns.slice(0, 4).join(", ")} and ${ns.length - 4} more` : ns.join(", "));
 
   async function check(all: boolean) {
     setErr("");
@@ -515,7 +521,7 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
                   <b>{pad(i + 1)} · {s.title || "Untitled"}</b>
                   <span className={`v ${stateMark[state]}`}>{stateText[state]}</span>
                 </div>
-                {s.check ? (s.check.claims.length ? <Claims claims={s.check.claims} /> : <p className="mute" style={{ margin: "4px 0 0" }}>No checkable facts.</p>) : <p className="mute" style={{ margin: "4px 0 0" }}>Not checked since the last change.</p>}
+                {s.check ? (s.check.claims.length ? <Claims claims={s.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, s.id, ci, ok))} /> : <p className="mute" style={{ margin: "4px 0 0" }}>No checkable facts.</p>) : <p className="mute" style={{ margin: "4px 0 0" }}>Not checked since the last change.</p>}
               </div>
             </div>
           );
@@ -528,7 +534,18 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
           <a className="btn ghost" href={`/handout/${lesson.id}`} target="_blank" rel="noreferrer">Student handout ↓</a>
         </div>
         <div className="row">
-          {!r.ok && <span className="mute" style={{ fontSize: 16 }}>{r.problems ? "Fix the ✗ facts first." : r.unchecked ? "Run the fact-check first." : "Add slides first."}</span>}
+          {!r.ok && (
+            <span className="mute" style={{ fontSize: 17 }}>
+              {r.problems
+                ? `Slide ${list(problemNums)} ${problemNums.length > 1 ? "have" : "has"} a wrong fact (✗) — fix the wording or take it out.`
+                : r.unchecked
+                  ? `Slide ${list(uncheckedNums)} ${uncheckedNums.length > 1 ? "aren't" : "isn't"} checked yet.`
+                  : "Add slides first."}
+            </span>
+          )}
+          {!r.ok && !r.problems && r.unchecked > 0 && (
+            <button className="btn" disabled={busy || st?.claude === false} onClick={() => check(false)}>{busy ? "checking…" : "check now"}</button>
+          )}
           <button className="btn solid" disabled={!r.ok}
             onClick={() => {
               if (r.unverified && !confirm(`${r.unverified} slide(s) still have facts no source could confirm. You've checked these yourself?`)) return;
@@ -621,7 +638,7 @@ export default function Prep() {
     recover(`slides:${id}`, (d) => upd((l) => withSlides(l, d as Slide[])));
     recover(`review:${id}`, (d) => upd((l) => withReview(l, d as ReviewDoc)));
     recover(`chat:${id}`, (d) => upd((l) => withChat(l, undefined, d as { reply: string; sources: Source[]; ops: ChatOp[] })));
-    recover(`check:${id}`, (d, m) => upd((l) => withCheck(l, d as { claims: Claim[]; at: string }, ((m as { ids?: string[] } | null)?.ids ?? []).filter(Boolean))));
+    recover(`check:${id}`, (d, m) => upd((l) => withCheck(l, d as { claims: Claim[]; at: string }, ((d as { checked?: string[] }).checked ?? (m as { ids?: string[] } | null)?.ids ?? []).filter(Boolean))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, lessonId]);
 
