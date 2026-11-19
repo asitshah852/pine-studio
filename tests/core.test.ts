@@ -181,3 +181,9 @@ test("page ranges come out of a stored textbook's text", async () => {
   assert.equal(slicePages(all, 2, 3), "[PDF page 2]\nTwo.\n\n[PDF page 3]\nThree.");
   assert.equal(slicePages(all, 5, 6), "");
 });
+
+test("finds the PDF download link on a book's page", async () => {
+  const { pdfLinks } = await import("../src/lib/pdflinks");
+  const html = `<a href="/about">About</a><a href="/formats/123">EPUB</a><a href="/formats/456"><span>PDF</span></a><a href="https://x.org/book.pdf">read</a><a href="/files/book.docx">Download Word</a>`;
+  assert.deepEqual(pdfLinks(html, "https://open.example.edu/textbooks/1"), ["https://open.example.edu/formats/456", "https://x.org/book.pdf"]);
+});

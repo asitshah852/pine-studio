@@ -2,14 +2,17 @@
 // this app; big files upload in parts). This route only hands out a short-lived upload permission.
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { denied, passcodeOk } from "@/lib/auth";
+import { blobToken } from "@/lib/blob";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as HandleUploadBody;
   // Vercel's own "upload finished" call is signed and checked by handleUpload; her request needs the passcode.
   if (body.type === "blob.generate-client-token" && !passcodeOk(req)) return denied();
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return Response.json({ error: "PDF storage isn't switched on yet (Vercel → Storage → Blob)." }, { status: 503 });
+  const token = blobToken();
+  if (!token) return Response.json({ error: "Uploading from your computer needs the storage key (BLOB_READ_WRITE_TOKEN) in Vercel. Saving from a link still works." }, { status: 503 });
   try {
     const r = await handleUpload({
+      token,
       body,
       request: req,
       onBeforeGenerateToken: async (pathname) => {

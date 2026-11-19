@@ -172,16 +172,20 @@ export default function Library() {
                 {pdfFor === r.id && (
                   <div className="pdfpanel">
                     {st?.pdfs === false ? (
-                      <p className="note" style={{ margin: 0 }}>PDF storage isn’t switched on yet. In Vercel: pine-studio → Storage → Create → Blob (choose <b>private</b>), connect it, then redeploy.</p>
+                      <p className="note" style={{ margin: 0 }}>PDF storage isn’t switched on yet. In Vercel: pine-studio → Storage → Blob (private) → connect it to pine-studio, then <b>Deployments → ⋯ → Redeploy</b>.</p>
                     ) : (
                       <>
                         <div className="row" style={{ alignItems: "end" }}>
-                          <div className="grow"><label className="label">paste the PDF download link</label><input className="input" placeholder="https://… .pdf" value={pdfLink} onChange={(e) => { setPdfLink(e.target.value); setPdfFile(null); }} /></div>
-                          <span className="mute">or</span>
-                          <label className="btn ghost" style={{ cursor: "pointer" }}>
-                            <input type="file" accept="application/pdf" className="hide" onChange={(e) => { setPdfFile(e.target.files?.[0] ?? null); setPdfLink(""); }} />
-                            {pdfFile ? pdfFile.name : "choose a PDF on your computer"}
-                          </label>
+                          <div className="grow"><label className="label">the book’s web page or its PDF link — pine studio finds the PDF</label><input className="input" placeholder="https://" value={pdfLink} onChange={(e) => { setPdfLink(e.target.value); setPdfFile(null); }} /></div>
+                          {st?.pdfUploads !== false && (
+                            <>
+                              <span className="mute">or</span>
+                              <label className="btn ghost" style={{ cursor: "pointer" }}>
+                                <input type="file" accept="application/pdf" className="hide" onChange={(e) => { setPdfFile(e.target.files?.[0] ?? null); setPdfLink(""); }} />
+                                {pdfFile ? pdfFile.name : "choose a PDF on your computer"}
+                              </label>
+                            </>
+                          )}
                         </div>
                         <div className="row">
                           <button className="btn solid" disabled={!!pdfBusy || (!pdfFile && !pdfLink.trim())} onClick={() => attachPdf(r.id, r.title, pdfFile, pdfLink)}>save PDF</button>
@@ -208,7 +212,7 @@ export default function Library() {
                   <button className="btn sm ghost" onClick={() => setOpenFind(openFind === r.id ? null : r.id)}>{openFind === r.id ? "hide" : "find a free copy"}</button>
                 )}
                 {(r.kind === "textbook" || r.kind === "journal" || r.kind === "paper") && !r.pdf && (
-                  <button className="btn sm ghost" onClick={() => { setPdfFor(r.id); setPdfErr(""); }}>add a PDF</button>
+                  <button className="btn sm ghost" onClick={() => { setPdfFor(r.id); setPdfErr(""); setPdfFile(null); setPdfLink(r.url ?? ""); }}>{isFreeBook(r) ? "save a PDF copy" : "add a PDF"}</button>
                 )}
                 {r.pdf && <button className="btn sm ghost" onClick={() => removePdf(r)}>remove PDF</button>}
                 <button className="btn sm ghost" onClick={() => openForm(r)}>edit</button>
