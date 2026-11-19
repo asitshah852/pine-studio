@@ -2,7 +2,9 @@
 // Library: one quiet list in four sections, a search box, and "+ add a resource" that opens in place.
 // Edit / remove / find a free copy appear on hover.
 import { useEffect, useMemo, useState } from "react";
-import { uid, useCollection } from "@/lib/client";
+import { api, uid, useCollection, useStatus } from "@/lib/client";
+import { pdfUrl, saveFromLink, uploadTextbook } from "@/lib/textbooks";
+import Working from "./Working";
 import { STARTER_RESOURCES, findLinks } from "@/lib/starter";
 import type { Resource, ResourceKind } from "@/lib/types";
 
@@ -26,6 +28,33 @@ export default function Library() {
   const [moreFields, setMoreFields] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [openFind, setOpenFind] = useState<string | null>(null);
+  const st = useStatus();
+  const [pdfFor, setPdfFor] = useState<string | null>(null); // resource id with the "add a PDF" panel open
+  const [pdfLink, setPdfLink] = useState("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfBusy, setPdfBusy] = useState("");
+  const [pdfErr, setPdfErr] = useState("");
+
+  // Store a PDF (file or download link) for a resource.
+  async function attachPdf(id: string, title: string, file: File | null, link: string) {
+    setPdfErr("");
+    try {
+      const pdf = file ? await uploadTextbook(file, setPdfBusy) : await saveFromLink(link.trim(), title, setPdfBusy);
+      update((cur) => cur.map((r) => (r.id === id ? { ...r, pdf } : r)));
+      setPdfFor(null);
+      setPdfLink("");
+      setPdfFile(null);
+    } catch (e) {
+      setPdfErr((e as Error).message);
+    } finally {
+      setPdfBusy("");
+    }
+  }
+  const removePdf = (r: Resource) => {
+    if (!r.pdf || !confirm(`Remove the stored PDF of “${r.title}”?`)) return;
+    api(`/api/blob/file?path=${encodeURIComponent(r.pdf.path)}`, { method: "DELETE" }).catch(() => {});
+    update((cur) => cur.map((x) => (x.id === r.id ? { ...x, pdf: undefined } : x)));
+  };
   useEffect(() => {
     const v = new URLSearchParams(window.location.search).get("q");
     if (v) setQ(v);
@@ -71,7 +100,11 @@ export default function Library() {
       notes: form.notes.trim(),
     };
     if (editing) update((cur) => cur.map((r) => (r.id === editing ? { ...r, ...data, starter: false } : r)));
-    else update((cur) => [{ id: uid(), addedAt: new Date().toISOString(), topics: [], ...data }, ...cur]);
+    else {
+      const id = uid();
+      update((cur) => [{ id, addedAt: new Date().toISOString(), topics: [], ...data }, ...cur]);
+      if (data.kind === "textbook" || data.kind === "journal" || data.kind === "paper") setPdfFor(id);
+    }
     closeForm();
   }
 
@@ -130,6 +163,37 @@ export default function Library() {
                 <h3>{r.url ? <a href={r.url} target="_blank" rel="noreferrer">{r.title}</a> : r.title}</h3>
                 {(r.author || r.publisher || r.year) && <div className="src">{[r.author, r.publisher, r.year].filter(Boolean).join(" · ")}</div>}
                 {r.notes && <p>{r.notes}</p>}
+                {r.pdf && (
+                  <div className="pdfline">
+                    <a href={pdfUrl(r.pdf.path)} target="_blank" rel="noreferrer">open your PDF ↗</a>
+                    <span className="mute">{r.pdf.pages ? `${r.pdf.pages} pages · ` : ""}{(r.pdf.size / 1e6).toFixed(1)} MB{r.pdf.textId ? " · ready for Prep’s textbook tool" : " · scanned (no text to pull from)"}</span>
+                  </div>
+                )}
+                {pdfFor === r.id && (
+                  <div className="pdfpanel">
+                    {st?.pdfs === false ? (
+                      <p className="note" style={{ margin: 0 }}>PDF storage isn’t switched on yet. In Vercel: pine-studio → Storage → Create → Blob (choose <b>private</b>), connect it, then redeploy.</p>
+                    ) : (
+                      <>
+                        <div className="row" style={{ alignItems: "end" }}>
+                          <div className="grow"><label className="label">paste the PDF download link</label><input className="input" placeholder="https://… .pdf" value={pdfLink} onChange={(e) => { setPdfLink(e.target.value); setPdfFile(null); }} /></div>
+                          <span className="mute">or</span>
+                          <label className="btn ghost" style={{ cursor: "pointer" }}>
+                            <input type="file" accept="application/pdf" className="hide" onChange={(e) => { setPdfFile(e.target.files?.[0] ?? null); setPdfLink(""); }} />
+                            {pdfFile ? pdfFile.name : "choose a PDF on your computer"}
+                          </label>
+                        </div>
+                        <div className="row">
+                          <button className="btn solid" disabled={!!pdfBusy || (!pdfFile && !pdfLink.trim())} onClick={() => attachPdf(r.id, r.title, pdfFile, pdfLink)}>save PDF</button>
+                          <button className="btn ghost" onClick={() => { setPdfFor(null); setPdfErr(""); }}>cancel</button>
+                        </div>
+                        <p className="mute" style={{ margin: 0, fontSize: 16 }}>Only open-licence books (e.g. Creative Commons) or your own copy for your teaching. Kept private: share the book’s original link with students, not this file.</p>
+                        {pdfBusy && <Working what="Saving the PDF" doing={pdfBusy} usual="under a minute for most books" />}
+                        {pdfErr && <div className="err">{pdfErr}</div>}
+                      </>
+                    )}
+                  </div>
+                )}
                 {openFind === r.id && (
                   <div className="find">
                     <span className="mute">find a free copy:</span>
@@ -143,8 +207,16 @@ export default function Library() {
                 {(r.kind === "textbook" || r.kind === "journal" || r.kind === "paper") && (
                   <button className="btn sm ghost" onClick={() => setOpenFind(openFind === r.id ? null : r.id)}>{openFind === r.id ? "hide" : "find a free copy"}</button>
                 )}
+                {(r.kind === "textbook" || r.kind === "journal" || r.kind === "paper") && !r.pdf && (
+                  <button className="btn sm ghost" onClick={() => { setPdfFor(r.id); setPdfErr(""); }}>add a PDF</button>
+                )}
+                {r.pdf && <button className="btn sm ghost" onClick={() => removePdf(r)}>remove PDF</button>}
                 <button className="btn sm ghost" onClick={() => openForm(r)}>edit</button>
-                <button className="btn sm ghost" onClick={() => confirm(`Remove “${r.title}”?`) && update((cur) => cur.filter((x) => x.id !== r.id))}>remove</button>
+                <button className="btn sm ghost" onClick={() => {
+                  if (!confirm(`Remove “${r.title}”${r.pdf ? " and its stored PDF" : ""}?`)) return;
+                  if (r.pdf) api(`/api/blob/file?path=${encodeURIComponent(r.pdf.path)}`, { method: "DELETE" }).catch(() => {});
+                  update((cur) => cur.filter((x) => x.id !== r.id));
+                }}>remove</button>
               </div>
             </article>
           ))}

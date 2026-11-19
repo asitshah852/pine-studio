@@ -12,8 +12,9 @@ email or GitHub — only into Vercel's settings.
    connect to the project (it adds the two `KV_…` settings itself).
 4. **Passcode:** add `APP_PASSCODE` = any phrase. Give it to Tanya; the site asks once per device.
 5. **YouTube exhibits:** add `YOUTUBE_API_KEY` (copy it from the Silent Sheep project: pp-studio-pyzt → Settings → Environment Variables). The Library of Congress needs no key.
-6. **Optional email of feedback notes:** `RESEND_API_KEY` and `FEEDBACK_EMAIL_TO`.
-7. **Deployments → ⋯ → Redeploy** so the new settings take effect.
+6. **Textbook PDFs:** Storage → Create → **Blob** → choose **private** → connect it to pine-studio (it adds `BLOB_READ_WRITE_TOKEN`). Free on the Hobby plan up to about 1 GB.
+7. **Optional email of feedback notes:** `RESEND_API_KEY` and `FEEDBACK_EMAIL_TO`.
+8. **Deployments → ⋯ → Redeploy** so the new settings take effect.
 
 **Check it worked:** the top-right dot reads **research on**, and the Prep page footer says
 "shared across your devices".

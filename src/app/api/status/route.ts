@@ -10,6 +10,7 @@ export function GET() {
     db: dbConfigured(),
     passcode: passcodeSet(),
     youtube: youtubeOn(),
+    pdfs: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
     email: Boolean(process.env.RESEND_API_KEY && process.env.FEEDBACK_EMAIL_TO),
   });
 }

@@ -18,11 +18,23 @@ export function TextbookPanel({ books }: { books: Resource[] }) {
   const [err, setErr] = useState("");
   const [points, setPoints] = useState<TextbookPoint[]>([]);
   const res = books.find((b) => b.title === book);
+  const stored = res?.pdf?.textId ? res.pdf : undefined;
+  const [from, setFrom] = useState(1);
+  const [to, setTo] = useState(10);
 
   async function run() {
     setErr("");
     setBusy(true);
     try {
+      if (stored && !file && !text.trim()) {
+        if (to < from || to - from > 39) throw new Error("Choose up to 40 pages at a time.");
+        const { pagesText } = await import("@/lib/textbooks");
+        const pages = await pagesText(stored.textId!, from, to);
+        if (!pages.trim()) throw new Error("No text on those pages (they may be pictures or blank).");
+        const r = await api<{ points: TextbookPoint[] }>("/api/textbook", { method: "POST", body: JSON.stringify({ text: pages, book, ask }) });
+        setPoints(r.points);
+        return;
+      }
       const pdf = file ? await readAsBase64(file) : undefined;
       if ((pdf?.length ?? 0) + text.length > MAX_UPLOAD) throw new Error("That's too big for one go: upload about 15 pages at a time.");
       const r = await api<{ points: TextbookPoint[] }>("/api/textbook", { method: "POST", body: JSON.stringify({ pdf, text: pdf ? undefined : text, book, ask }) });
@@ -42,13 +54,22 @@ export function TextbookPanel({ books }: { books: Resource[] }) {
         <input className="input" list="books" value={book} onChange={(e) => setBook(e.target.value)} />
         <datalist id="books">{books.map((b) => <option key={b.id} value={b.title} />)}</datalist>
       </div>
+      {stored && (
+        <div className="row" style={{ alignItems: "end" }}>
+          <span className="mute">from your stored copy ({stored.pages} pages): PDF pages</span>
+          <input className="input" type="number" min={1} max={stored.pages} style={{ width: 80 }} value={from} onChange={(e) => setFrom(Number(e.target.value) || 1)} aria-label="From page" />
+          <span className="mute">to</span>
+          <input className="input" type="number" min={1} max={stored.pages} style={{ width: 80 }} value={to} onChange={(e) => setTo(Number(e.target.value) || 1)} aria-label="To page" />
+        </div>
+      )}
+      {stored && <span className="mute" style={{ fontSize: 16 }}>…or use other pages instead:</span>}
       <label className="drop drop-file" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f?.type === "application/pdf") setFile(f); }}>
         <input type="file" accept="application/pdf" className="hide" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         {file ? `${file.name} · ${(file.size / 1e6).toFixed(1)} MB` : "Drop a PDF of the pages, or click to choose"}
       </label>
       {!file && <textarea className="area" value={text} onChange={(e) => setText(e.target.value)} placeholder="…or paste the passage here" />}
       <input className="input" value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="What to pull out (optional): e.g. key terms and 3 works to show" />
-      <button className="btn solid" disabled={busy || (!file && !text.trim()) || st?.claude === false} onClick={run}>{busy ? "reading…" : "pull out points"}</button>
+      <button className="btn solid" disabled={busy || (!file && !text.trim() && !stored) || st?.claude === false} onClick={run}>{busy ? "reading…" : "pull out points"}</button>
       {busy && <Working what="Reading the pages" doing="Pulling out key points with page numbers and exact quotes" usual="under a minute" />}
       {err && <div className="err">{err}</div>}
       {points.map((p, i) => {

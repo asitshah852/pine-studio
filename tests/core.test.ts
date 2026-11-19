@@ -174,3 +174,10 @@ test("'I've checked this' turns an unverified fact into a confirmed one, and bac
   assert.equal(readiness(l1).ok, true);
   assert.equal(confirmClaim(l1, sl.id, 0, false).slides[0].check?.claims[0].verdict, "unverified");
 });
+
+test("page ranges come out of a stored textbook's text", async () => {
+  const { slicePages } = await import("../src/lib/textbooks");
+  const all = "--- Page 1 ---\nOne.\n\n--- Page 2 ---\nTwo.\n\n--- Page 3 ---\nThree.";
+  assert.equal(slicePages(all, 2, 3), "[PDF page 2]\nTwo.\n\n[PDF page 3]\nThree.");
+  assert.equal(slicePages(all, 5, 6), "");
+});

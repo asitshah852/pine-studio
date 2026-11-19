@@ -26,7 +26,7 @@ const PASS = "pine.passcode";
 export const getPass = () => load<string>(PASS, "");
 export const setPass = (v: string) => save(PASS, v.trim());
 
-export type Status = { claude: boolean; db: boolean; passcode: boolean; email: boolean; youtube?: boolean };
+export type Status = { claude: boolean; db: boolean; passcode: boolean; email: boolean; youtube?: boolean; pdfs?: boolean };
 let statusP: Promise<Status> | null = null;
 export const getStatus = () =>
   (statusP ??= fetch("/api/status")

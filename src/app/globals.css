@@ -531,3 +531,6 @@ h2 { font-size: 28px; }
 .find a { color: var(--ink2); }
 @media (hover: none) { .lib-actions { opacity: 1; } }
 @media (max-width: 860px) { .lib-item { flex-direction: column; gap: 6px; } .lib-tools { flex-direction: column; align-items: stretch; } }
+
+.pdfline { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 17px; }
+.pdfpanel { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; padding: 14px 0 4px; border-top: 1px dashed var(--line); }

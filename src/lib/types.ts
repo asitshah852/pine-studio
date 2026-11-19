@@ -166,6 +166,7 @@ export type Resource = {
   topics: string[];
   notes: string;
   starter?: boolean; // from the starter list: confirm the edition she assigns
+  pdf?: { path: string; name: string; size: number; pages?: number; textId?: string }; // her own copy (private storage)
   addedAt: string;
 };
 
