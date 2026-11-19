@@ -2,7 +2,7 @@ import { claudeOn } from "@/lib/claude";
 import { dbConfigured } from "@/lib/db";
 import { passcodeSet } from "@/lib/auth";
 import { youtubeOn } from "@/lib/sources";
-import { blobOn, blobUploadsOn } from "@/lib/blob";
+import { blobOn, blobUploadMode, blobUploadsOn } from "@/lib/blob";
 
 export const dynamic = "force-dynamic";
 export function GET() {
@@ -13,6 +13,7 @@ export function GET() {
     youtube: youtubeOn(),
     pdfs: blobOn(),
     pdfUploads: blobUploadsOn(),
+    pdfUploadMode: blobUploadMode(),
     email: Boolean(process.env.RESEND_API_KEY && process.env.FEEDBACK_EMAIL_TO),
   });
 }

@@ -10,8 +10,9 @@ export function blobToken(): string | undefined {
 const storeId = () => process.env.BLOB_STORE_ID || Object.entries(process.env).find(([k, v]) => v && /BLOB_STORE_ID$/.test(k))?.[1];
 
 export const blobOn = () => Boolean(blobToken() || storeId());
-/** Uploads from her computer need the key (to sign a short upload permission). */
-export const blobUploadsOn = () => Boolean(blobToken());
+/** Uploads from her computer: with a key we hand out a client token; without one, a presigned link. */
+export const blobUploadsOn = () => blobOn();
+export const blobUploadMode = () => (blobToken() ? "token" : "presigned");
 
 /** Options to pass to put / get / del. */
 export function blobAuth(): { token?: string; storeId?: string } {

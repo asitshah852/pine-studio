@@ -1,13 +1,14 @@
 "use client";
 // Her own textbook PDFs: upload to private storage, keep the text for Prep's Textbook tool.
-import { upload } from "@vercel/blob/client";
-import { apiJob, getPass } from "./client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
+import { apiJob, getPass, getStatus } from "./client";
 import { loadText } from "./files";
 
 export async function uploadTextbook(file: File, onProgress: (s: string) => void, resourceId = "") {
   const safe = file.name.replace(/[^\w.\- ()]/g, "_").replace(/\.pdf$/i, "") + ".pdf";
   onProgress("uploading… 0% (keep this tab open until 100%)");
-  const blob = await upload(`textbooks/${safe}`, file, {
+  const send = (await getStatus()).pdfUploadMode === "presigned" ? uploadPresigned : upload;
+  const blob = await send(`textbooks/${safe}`, file, {
     access: "private",
     handleUploadUrl: "/api/blob/upload",
     headers: { "x-pine-passcode": getPass() },
