@@ -15,6 +15,7 @@ import { ACCEPT } from "@/lib/importers";
 import { uid } from "@/lib/client";
 import type { Lesson, Resource } from "@/lib/types";
 import Improve, { importAll, UploadButton } from "./Improve";
+import Renamable from "./Renamable";
 import SlideView from "./SlideView";
 
 function Present({ lesson, close }: { lesson: Lesson; close: () => void }) {
@@ -75,7 +76,7 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
       <div className="head" style={{ marginTop: 18 }}>
         <div>
           <div className="mono mute">{course} · Class {pad(lesson.number)}{lesson.example ? " · example" : ""}</div>
-          <h1 style={{ marginTop: 6 }}>{lesson.topic}</h1>
+          <h1 style={{ marginTop: 6 }}><Renamable value={lesson.topic} onSave={(topic) => updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? { ...l, topic } : l)))} /></h1>
           {lesson.premise && <p>{lesson.premise}</p>}
         </div>
         <div className="row">
@@ -225,11 +226,10 @@ export default function Classes() {
       <div className="head">
         <div>
           <h1>Classes</h1>
-          <p>Your courses and their classes. Open a class to present it, download the slides or the research document, or edit it in Prep.</p>
+          <p>Your courses and their classes. Open a class to present it or download it; add classes inside each course. Right-click a name to rename it.</p>
         </div>
         <div className="row">
-          <button className="btn ghost" onClick={() => setAdding(true)}>+ New course</button>
-          <Link className="btn solid" href="/prep?new=1">+ New class</Link>
+          <button className="btn solid" onClick={() => setAdding(true)}>+ new course</button>
         </div>
       </div>
 
@@ -247,12 +247,11 @@ export default function Classes() {
         return (
           <section key={c.id} id={`c-${c.id}`} className="course">
             <div className="coursehead">
-              <h2>{c.name}</h2>
+              <h2>{c.id === OTHER ? c.name : <Renamable value={c.name} onSave={(name) => updateCourses((cur) => cur.map((x) => (x.id === c.id ? { ...x, name, example: false } : x)))} />}</h2>
               <div className="row">
                 <span className="mono mute">{ls.length} class{ls.length === 1 ? "" : "es"}</span>
                 {c.id !== OTHER && (
                   <>
-                    <button className="btn sm ghost" onClick={() => { const n = prompt("Course name", c.name); if (n?.trim()) updateCourses((cur) => cur.map((x) => (x.id === c.id ? { ...x, name: n.trim(), example: false } : x))); }}>Rename</button>
                     <button className="btn sm ghost" onClick={() => {
                       if (!confirm(ls.length ? `Delete “${c.name}” and its ${ls.length} class(es)?` : `Delete “${c.name}”?`)) return;
                       updateLessons((cur) => cur.filter((l) => l.courseId !== c.id));
@@ -289,7 +288,7 @@ export default function Classes() {
                     <span className="num serif">{pad(l.number)}</span>
                     <span className="thumb">{l.slides[0] ? <SlideView s={l.slides[0]} n={l.number} /> : <span className="slide"><span className="ph">no slides</span></span>}</span>
                     <span className="grow">
-                      <span className="t">{l.topic}</span>
+                      <Renamable className="t" value={l.topic} onSave={(topic) => updateLessons((cur) => cur.map((x) => (x.id === l.id ? { ...x, topic } : x)))} />
                       {l.premise && <span className="src" style={{ display: "block" }}>{l.premise}</span>}
                     </span>
                     <span className="mono mute meta">

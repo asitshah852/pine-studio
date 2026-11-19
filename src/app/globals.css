@@ -401,3 +401,11 @@ h2 { font-size: 28px; }
 .coursehead h2 { font-size: 30px; }
 .item h3 { font-size: 19px; }
 .claims > div { font-size: 17px; }
+
+/* rename in place + drag to reorder courses */
+.rename { font: inherit; color: inherit; letter-spacing: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--ink); padding: 0; outline: none; max-width: 100%; }
+.classrow .t.rename, .classrow span.t { display: block; }
+.subitem { cursor: grab; border-top: 1px solid transparent; }
+.subitem.dragging { opacity: 0.35; }
+.subitem.over { border-top-color: var(--ink); }
+.subitem a { display: block; }

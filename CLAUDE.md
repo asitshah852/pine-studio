@@ -12,6 +12,7 @@
 - Tabs (Asit, Nov 2026): Classes (by course) · Prep (1 Brief → 2 Research doc + questions + exhibits → 3 auto slides with talking points & plain-language speaker notes → 4 Check & finish) · Library · Checker · Feedback. See README.md.
 - Prep brief is just course, class number, topic and premise (no dates/units).
 - She has already taught some classes (Asit, Nov 2026): Classes → "+ existing class" uploads her materials (pptx → slides; pdf/docx → materials); "suggest improvements" next to every class sends it to Prep for a sourced review she accepts or dismisses item by item.
+- Classes page (Asit, Nov 2026): no top "new class" button (classes are added inside each course); courses reorder by dragging in the sidebar; right-click any course or class name to rename it.
 - Asit finds small type hard to read: keep text about two points larger than her own site.
 - Design (Asit, Nov 2026): match Tanya's own artist website — white page, Cormorant Garamond for
   everything (wordmark "pine studio" all one font, letterspaced, lower case), left-hand menu with

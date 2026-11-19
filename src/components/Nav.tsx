@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getPass, load, save, setPass, useStatus } from "@/lib/client";
 import { OTHER, useStudio } from "@/lib/studio";
+import Renamable from "./Renamable";
 
 const TABS = [
   ["/classes", "classes"],
@@ -18,7 +19,9 @@ const TABS = [
 export default function Nav() {
   const path = usePathname();
   const st = useStatus();
-  const { courses } = useStudio();
+  const { courses, updateCourses } = useStudio();
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const [dark, setDark] = useState(false);
   const [needPass, setNeedPass] = useState(false);
   const [pass, setP] = useState("");
@@ -48,9 +51,37 @@ export default function Nav() {
           <div key={href}>
             <Link href={href} aria-current={path.startsWith(href) ? "page" : undefined}>{label}</Link>
             {href === "/classes" && courses.filter((c) => c.id !== OTHER).length > 0 && (
-              <div className="sub">
+              <div className="sub" title="Drag to reorder · right-click to rename">
                 {courses.filter((c) => c.id !== OTHER).map((c) => (
-                  <Link key={c.id} href={`/classes#c-${c.id}`}>{c.name.toLowerCase()}</Link>
+                  <div
+                    key={c.id}
+                    className={`subitem ${dragId === c.id ? "dragging" : ""} ${overId === c.id && dragId !== c.id ? "over" : ""}`}
+                    draggable
+                    onDragStart={(e) => { setDragId(c.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/x-pine-course", c.id); }}
+                    onDragOver={(e) => { if (dragId) { e.preventDefault(); setOverId(c.id); } }}
+                    onDragLeave={() => setOverId((o) => (o === c.id ? null : o))}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = dragId;
+                      setDragId(null);
+                      setOverId(null);
+                      if (!from || from === c.id) return;
+                      updateCourses((cur) => {
+                        const next = cur.filter((x) => x.id !== from);
+                        const moved = cur.find((x) => x.id === from)!;
+                        const at = next.findIndex((x) => x.id === c.id);
+                        const fromIdx = cur.findIndex((x) => x.id === from);
+                        const toIdx = cur.findIndex((x) => x.id === c.id);
+                        next.splice(fromIdx < toIdx ? at + 1 : at, 0, moved);
+                        return next;
+                      });
+                    }}
+                    onDragEnd={() => { setDragId(null); setOverId(null); }}
+                  >
+                    <Link href={`/classes#c-${c.id}`} draggable={false}>
+                      <Renamable value={c.name} display={c.name.toLowerCase()} onSave={(name) => updateCourses((cur) => cur.map((x) => (x.id === c.id ? { ...x, name, example: false } : x)))} />
+                    </Link>
+                  </div>
                 ))}
               </div>
             )}
