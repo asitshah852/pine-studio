@@ -11,12 +11,13 @@ import Working from "./Working";
 
 const STARTERS = [
   "What's missing from this class?",
+  "Finish up",
   "Find two works in Chicago collections I could compare on one slide",
   "Make the talking points simpler for 19-year-olds",
   "Add a slide with a quick in-class activity",
 ];
 
-export default function Talk({ lesson, course, set, close }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; close: () => void }) {
+export default function Talk({ lesson, course, set, close, onActions }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; close: () => void; onActions?: (ops: ChatOp[]) => void }) {
   const st = useStatus();
   const key = `chat:${lesson.id}`;
   const job = useJob(key);
@@ -43,6 +44,7 @@ export default function Talk({ lesson, course, set, close }: { lesson: Lesson; c
       });
       set((l) => withChat(l, user, r));
       forget(key);
+      onActions?.(r.ops);
     });
   }
 

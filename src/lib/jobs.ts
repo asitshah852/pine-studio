@@ -94,8 +94,8 @@ export async function recover(key: string, apply: (data: unknown, meta: unknown)
 }
 
 /** Run a job outside a component (e.g. "make my class"), with a stage label the page can show. */
-export async function runJob(key: string, fn: (stage: (s: string) => void) => Promise<void>) {
-  if (jobs.get(key) && !jobs.get(key)!.error) return;
+export async function runJob(key: string, fn: (stage: (s: string) => void) => Promise<void>): Promise<boolean> {
+  if (jobs.get(key) && !jobs.get(key)!.error) return false;
   jobs.set(key, { started: Date.now() });
   emit();
   try {
@@ -107,8 +107,11 @@ export async function runJob(key: string, fn: (stage: (s: string) => void) => Pr
       }
     });
     jobs.delete(key);
+    emit();
+    return true;
   } catch (e) {
     jobs.set(key, { started: 0, error: (e as Error).message });
+    emit();
+    return false;
   }
-  emit();
 }

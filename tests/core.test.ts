@@ -41,16 +41,19 @@ test("a copyrighted work gets a preview flagged rights: check", () => {
   assert.equal(s.images[0]?.rights, "check");
 });
 
-test("any edit clears the check; ready needs every slide checked and no errors", () => {
+test("any edit clears the check; unchecked slides are flagged but never block", () => {
   const checked = { ...blankSlide("text", "A"), body: "fact", check: { at: "t", claims: [] } };
   assert.equal(slideState(checked), "ok");
   const edited = addTo(checked, { kind: "text", text: "new fact", sources: [], verified: false });
   assert.equal(slideState(edited), "unchecked");
   const lesson = (slides: Lesson["slides"]): Lesson => ({ id: "l", courseId: "c", number: 1, topic: "t", premise: "", readings: [], status: "draft", slides });
-  assert.equal(readiness(lesson([edited])).ok, false);
+  // Unchecked or unverified slides are notes, not a gate: she can always move ahead.
+  assert.equal(readiness(lesson([edited])).ok, true);
+  assert.equal(readiness(lesson([edited])).clean, false);
   const bad = { ...checked, check: { at: "t", claims: [{ text: "x", verdict: "contradicted" as const, sources: [] }] } };
   assert.equal(readiness(lesson([checked, bad])).problems, 1);
-  assert.equal(readiness(lesson([checked])).ok, true);
+  assert.equal(readiness(lesson([checked])).clean, true);
+  assert.equal(readiness(lesson([])).ok, false);
 });
 
 test("deck sources are de-duplicated", () => {
@@ -171,7 +174,7 @@ test("'I've checked this' turns an unverified fact into a confirmed one, and bac
   const l1 = confirmClaim(l0, sl.id, 0, true);
   assert.equal(l1.slides[0].check?.claims[0].confirmed, true);
   assert.equal(readiness(l1).unverified, 0);
-  assert.equal(readiness(l1).ok, true);
+  assert.equal(readiness(l1).clean, true);
   assert.equal(confirmClaim(l1, sl.id, 0, false).slides[0].check?.claims[0].verdict, "unverified");
 });
 
@@ -186,4 +189,8 @@ test("finds the PDF download link on a book's page", async () => {
   const { pdfLinks } = await import("../src/lib/pdflinks");
   const html = `<a href="/about">About</a><a href="/formats/123">EPUB</a><a href="/formats/456"><span>PDF</span></a><a href="https://x.org/book.pdf">read</a><a href="/files/book.docx">Download Word</a>`;
   assert.deepEqual(pdfLinks(html, "https://open.example.edu/textbooks/1"), ["https://open.example.edu/formats/456", "https://x.org/book.pdf"]);
+  const { nextPages } = await import("../src/lib/pdflinks");
+  const bepress = `<a href="https://oer.galileo.usg.edu/cgi/viewcontent.cgi?article=1002&amp;context=arts-textbooks">Download</a>`;
+  assert.deepEqual(pdfLinks(bepress, "https://oer.galileo.usg.edu/arts-textbooks/3"), ["https://oer.galileo.usg.edu/cgi/viewcontent.cgi?article=1002&context=arts-textbooks"]);
+  assert.deepEqual(nextPages(`<a href="/download/9">Download this book</a>`, "https://a.edu/x"), ["https://a.edu/download/9"]);
 });

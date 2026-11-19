@@ -87,8 +87,10 @@ export function applyOps(l: Lesson, ops: ChatOp[]): Lesson {
 }
 
 /** Add a chat exchange; apply its changes with an undo snapshot (only the newest change keeps one). */
+export const ACTIONS = new Set(["goto_slide", "run_check", "run_slides", "run_research", "finish"]);
+
 export function withChat(l: Lesson, user: ChatMessage | undefined, reply: { reply: string; sources: Source[]; ops: ChatOp[] }): Lesson {
-  const undo = reply.ops.length ? { slides: l.slides, research: l.research } : undefined;
+  const undo = reply.ops.some((o) => !ACTIONS.has(o.op)) ? { slides: l.slides, research: l.research } : undefined;
   const changed = reply.ops.length ? applyOps(l, reply.ops) : l;
   const prev = (l.chat ?? []).filter((m) => m.id !== user?.id).map((m) => (undo && m.undo ? { ...m, undo: undefined } : m));
   const msg: ChatMessage = { id: newId(), role: "assistant", text: reply.reply, at: new Date().toISOString(), sources: reply.sources, ops: reply.ops.map((o) => o.label), undo };

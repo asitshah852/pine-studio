@@ -116,7 +116,13 @@ export type ChatOp =
   | { op: "edit_paragraph"; label: string; paragraphId: string; text: string }
   | { op: "add_paragraph"; label: string; sectionId?: string; heading?: string; text: string; sources: Source[]; verified: boolean }
   | { op: "add_question"; label: string; text: string }
-  | { op: "add_exhibit"; label: string; artwork: Artwork; why: string; slideId?: string };
+  | { op: "add_exhibit"; label: string; artwork: Artwork; why: string; slideId?: string }
+  // Actions the page carries out after the reply (they change nothing by themselves):
+  | { op: "goto_slide"; label: string; slideId: string }
+  | { op: "run_check"; label: string }
+  | { op: "run_slides"; label: string; count?: number }
+  | { op: "run_research"; label: string }
+  | { op: "finish"; label: string };
 
 export type ChatMessage = {
   id: string;

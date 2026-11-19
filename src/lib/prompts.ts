@@ -1,5 +1,5 @@
 // The three Claude jobs: research a topic, pull points from her textbook, fact-check text.
-import { ask, groundSources, parseJson } from "./claude";
+import { ask, groundSources, normUrl, parseJson } from "./claude";
 import { caption, findWork } from "./museum";
 import type { Artwork, Claim, ExhibitSuggestion, ResearchDoc, ReviewDoc, Slide, Source, Suggestion, TextbookPoint, Verdict } from "./types";
 
@@ -186,10 +186,16 @@ Return ONLY JSON: { "points": [ { "text": "the point in plain words", "quote": "
     }));
 }
 
-export type CheckInput = { id?: string; text: string }[];
+
+export type CheckInput = { id?: string; text: string; sources?: { title: string; url: string }[] }[];
 
 export async function factCheck(items: CheckInput, uploads: { kind: "image" | "pdf"; data: string }[] = []): Promise<Claim[]> {
-  const body = items.map((it, i) => `[${it.id ?? `part-${i + 1}`}]\n${it.text}`).join("\n\n");
+  const body = items
+    .map((it, i) => {
+      const known = (it.sources ?? []).map((x) => `  - ${x.title} — ${x.url}`).join("\n");
+      return `[${it.id ?? `part-${i + 1}`}]\n${it.text}${known ? `\nSources already found for this part (from the class research and museum records):\n${known}` : ""}`;
+    })
+    .join("\n\n");
   const content: Parameters<typeof ask>[0]["content"] = [];
   for (const u of uploads) {
     if (u.kind === "image") content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: u.data } });
@@ -197,20 +203,30 @@ export async function factCheck(items: CheckInput, uploads: { kind: "image" | "p
   }
   content.push({
     type: "text",
-    text: `Fact-check ${uploads.length ? "the attached slides/pages and " : ""}the text below. Find every checkable factual claim (names, dates, attributions, places, media, movements, quotes, numbers). Opinions and discussion questions are not claims. Search the web to check each one.
+    text: `Fact-check ${uploads.length ? "the attached slides/pages and " : ""}the text below, sensibly — like a careful colleague, not a pedant.
+
+Check only the KEY facts a student could be misled by: names, dates, titles of works, attributions, places, numbers and direct quotes. At most 3 claims per part; pick the ones that matter.
+Do NOT list: opinions, interpretations, teaching prompts, discussion questions, general statements, or well-known common knowledge.
+Verdicts:
+- "supported" when a reputable source substantially agrees (small differences in wording, rounding or date precision are fine). A source already listed for that part counts — you may cite it.
+- "contradicted" only when a reliable source clearly says otherwise; give the corrected wording.
+- "unverified" only when you genuinely could not find anything either way.
+Search the web where needed.
 
 ${body || "(no pasted text)"}
 
-Return ONLY JSON: { "claims": [ { "part": "the [id] the claim came from, or 'upload'", "text": "the claim as written", "verdict": "supported | contradicted | unverified", "fix": "corrected wording if contradicted, else empty", "sources": [ { "title": "...", "url": "exact URL you retrieved" } ] } ] }`,
+Return ONLY JSON: { "claims": [ { "part": "the [id] the claim came from, or 'upload'", "text": "the claim as written", "verdict": "supported | contradicted | unverified", "fix": "corrected wording if contradicted, else empty", "sources": [ { "title": "...", "url": "exact URL you retrieved or that is listed above" } ] } ] }`,
   });
   const { text, retrieved } = await ask({ system: HOUSE, search: 10, effort: "medium", content });
+  // Sources the slides already carried were found earlier by real searches, so they count as retrieved.
+  for (const it of items) for (const x of it.sources ?? []) retrieved.set(normUrl(x.url), x.title);
   const raw = parseJson<{ claims?: { part?: string; text?: string; verdict?: string; fix?: string; sources?: { title?: string; url?: string }[] }[] }>(text);
   return (raw.claims ?? [])
     .filter((c) => c?.text)
     .map((c) => {
-      const sources = groundSources(c.sources, retrieved);
+      const sources = groundSources(c.sources, retrieved, true);
       let verdict: Verdict = c.verdict === "supported" || c.verdict === "contradicted" ? c.verdict : "unverified";
-      // A verdict with no retrieved source behind it can't stand.
+      // A verdict with no real source behind it can't stand.
       if (!sources.length) verdict = "unverified";
       const part = String(c.part ?? "").replace(/[[\]]/g, "");
       return {
@@ -222,7 +238,6 @@ Return ONLY JSON: { "claims": [ { "part": "the [id] the claim came from, or 'upl
       };
     });
 }
-
 
 /** "Suggest improvements": review a class she has already taught (her slides + materials). */
 export async function review(input: {

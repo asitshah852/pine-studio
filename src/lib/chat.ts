@@ -34,6 +34,11 @@ const TOOLS: B[] = [
     sources: { type: "array", items: { type: "object", properties: { title: str, url: str }, required: ["title", "url"], additionalProperties: false } },
   }, ["section_id", "new_section_heading", "text", "sources"]),
   tool("add_discussion_question", "Add a discussion question for students.", { text: str }, ["text"]),
+  tool("show_slide", "Show her a slide in the editor (e.g. 'go to slide 5').", { slide_id: str }, ["slide_id"]),
+  tool("fact_check_slides", "Fact-check the slides that changed since their last check.", {}, []),
+  tool("remake_slides", "Rebuild the whole deck from the research document (the current slides are kept as an earlier version).", { count: { type: "integer", description: "about how many slides, 8–22" } }, ["count"]),
+  tool("research_again", "Write a fresh research document for the class (the current one is kept as an earlier version). Takes 2–3 minutes.", {}, []),
+  tool("finish_class", "Finish the class: fact-check anything not yet checked, then mark it ready for class (it appears in Classes). Use when she says finish up, wrap up, I'm done, or similar.", {}, []),
 ];
 
 const SYSTEM = `${HOUSE}
@@ -42,7 +47,8 @@ You are now talking with Tanya inside her prep tool about one class. Be a warm, 
 - Facts in your replies or in anything you add must come from web_search results in this conversation; cite them. If you can't source something, say so.
 - Exhibits only come from find_exhibits (real museum, Library of Congress or YouTube records). Never invent a work, record or video. For YouTube, prefer official artist, label or museum channels and say which channel it is.
 - Talking points: 3–5 short bullets in plain spoken language; on exhibit slides they link the research to the work on screen.
-- Refer to slides by their number, not their id.`;
+- Refer to slides by their number, not their id.
+- She can run the whole deck through you. "Finish up" / "wrap it up" / "I'm done" → finish_class (unconfirmed facts don't stop it). "Check it" → fact_check_slides. "Show me slide N" → show_slide. "Start the slides over" → remake_slides. Long jobs run after your reply; say they've started.`;
 
 function snapshot(l: Lesson, course: string): string {
   const d = l.research;
@@ -183,6 +189,29 @@ export async function chat(input: { lesson: Lesson; course: string; history: { r
             ok(sources.length ? "Done." : "Added, but none of those sources were retrieved in this conversation, so it is marked unverified. Search first if you can.");
             break;
           }
+          case "show_slide": {
+            const id = s(a.slide_id);
+            if (!slideIds.has(id)) { bad("Unknown slide id."); break; }
+            ops.push({ op: "goto_slide", label: `Showing slide ${pos(id)}`, slideId: id });
+            ok("Done.");
+            break;
+          }
+          case "fact_check_slides":
+            ops.push({ op: "run_check", label: "Fact-check started" });
+            ok("The fact-check will run right after your reply.");
+            break;
+          case "remake_slides":
+            ops.push({ op: "run_slides", label: "Remaking the slides from the research", count: Math.min(22, Math.max(8, Number(a.count) || 12)) });
+            ok("The slides will be rebuilt right after your reply (1–2 minutes).");
+            break;
+          case "research_again":
+            ops.push({ op: "run_research", label: "Researching again" });
+            ok("New research will start right after your reply (2–3 minutes).");
+            break;
+          case "finish_class":
+            ops.push({ op: "finish", label: "Finishing: checking any new slides, then marking the class ready" });
+            ok("Finishing will run right after your reply.");
+            break;
           case "add_discussion_question": {
             ops.push({ op: "add_question", label: "Added a discussion question", text: s(a.text) });
             ok("Done.");

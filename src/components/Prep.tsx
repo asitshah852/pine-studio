@@ -264,6 +264,11 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
   useEffect(() => {
     if (initial) setSel(initial);
   }, [initial]);
+  useEffect(() => {
+    const go = (e: Event) => setSel((e as CustomEvent<string>).detail);
+    window.addEventListener("pine:goto-slide", go);
+    return () => window.removeEventListener("pine:goto-slide", go);
+  }, []);
   const checkJob = useJob(`check:${lesson.id}`);
   const [tool, setTool] = useState<"exhibits" | "textbook" | "images" | "library">("exhibits");
   const [q, setQ] = useState("");
@@ -534,21 +539,23 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
           <a className="btn ghost" href={`/handout/${lesson.id}`} target="_blank" rel="noreferrer">Student handout ↓</a>
         </div>
         <div className="row">
-          {!r.ok && (
+          {!r.clean && (
             <span className="mute" style={{ fontSize: 17 }}>
-              {r.problems
-                ? `Slide ${list(problemNums)} ${problemNums.length > 1 ? "have" : "has"} a wrong fact (✗) — fix the wording or take it out.`
-                : r.unchecked
-                  ? `Slide ${list(uncheckedNums)} ${uncheckedNums.length > 1 ? "aren't" : "isn't"} checked yet.`
-                  : "Add slides first."}
+              {!lesson.slides.length
+                ? "Add slides first."
+                : [
+                    r.problems ? `slide ${list(problemNums)}: a fact looks wrong (✗)` : "",
+                    r.unchecked ? `slide ${list(uncheckedNums)} not checked yet` : "",
+                    r.unverified ? `${r.unverified} slide(s) with unconfirmed facts` : "",
+                  ].filter(Boolean).join(" · ") + " — you can still go ahead."}
             </span>
           )}
-          {!r.ok && !r.problems && r.unchecked > 0 && (
+          {r.unchecked > 0 && (
             <button className="btn" disabled={busy || st?.claude === false} onClick={() => check(false)}>{busy ? "checking…" : "check now"}</button>
           )}
           <button className="btn solid" disabled={!r.ok}
             onClick={() => {
-              if (r.unverified && !confirm(`${r.unverified} slide(s) still have facts no source could confirm. You've checked these yourself?`)) return;
+              if (r.problems && !confirm(`The check thinks slide ${list(problemNums)} has a wrong fact. Go ahead anyway?`)) return;
               set((l) => ({ ...l, status: "ready", readyAt: new Date().toISOString() }));
               router.push(`/classes?open=${lesson.id}`);
             }}>
@@ -663,6 +670,45 @@ export default function Prep() {
     return saved;
   }
 
+  // Things the chat asked for ("finish up", "check it", "show me slide 5", …), run after its reply.
+  async function onActions(ops: ChatOp[]) {
+    const id = current.current?.id;
+    if (!id) return;
+    await new Promise((ok) => setTimeout(ok, 60)); // let the reply's own edits land first
+    const latest = () => current.current ?? lessons.find((l) => l.id === id)!;
+    const upd = (fn: (x: Lesson) => Lesson) => updateLessons((cur) => cur.map((x) => (x.id === id ? fn(x) : x)));
+    const say = (text: string) => upd((l) => ({ ...l, chat: [...(l.chat ?? []), { id: uid(), role: "assistant" as const, text, at: new Date().toISOString() }].slice(-40) }));
+    const c = courseName(latest().courseId) || "";
+    for (const o of ops) {
+      if (o.op === "goto_slide") {
+        setStep(3);
+        setTimeout(() => window.dispatchEvent(new CustomEvent("pine:goto-slide", { detail: o.slideId })), 50);
+      } else if (o.op === "run_check") {
+        setStep(4);
+        say((await runJob(`check:${id}`, () => runCheck(latest(), upd))) ? "Fact-check done — see step 4." : "The fact-check didn't finish — try again in a moment.");
+      } else if (o.op === "run_slides") {
+        setStep(3);
+        say((await runJob(`slides:${id}`, () => runSlides(latest(), c, upd, o.count).then(() => {}))) ? "New slides are ready (the old ones are under “earlier versions”)." : "Remaking the slides didn't finish — your current slides are unchanged.");
+      } else if (o.op === "run_research") {
+        setStep(2);
+        say((await runJob(`research:${id}`, () => runResearch(latest(), c, upd).then(() => {}))) ? "The new research document is ready (the old one is under “earlier versions”)." : "The new research didn't finish — your current document is unchanged.");
+      } else if (o.op === "finish") {
+        setStep(4);
+        await runJob(`make:${id}`, async (stage) => {
+          if (latest().slides.some((x) => !x.check)) {
+            stage("checking the last slides");
+            await runCheck(latest(), upd).catch(() => {}); // finishing goes ahead even if the check can't run
+          }
+          stage("marking it ready");
+          upd((l) => ({ ...l, status: "ready", readyAt: new Date().toISOString() }));
+        });
+        await new Promise((ok) => setTimeout(ok, 120)); // let the last check land before summing up
+        const r = readiness(latest());
+        say(`Done — Class ${latest().number} is ready and in Classes.${r.problems ? ` Note: the check still flags slide(s) with a possibly wrong fact (✗) — worth a look.` : ""}${r.unverified ? ` ${r.unverified} slide(s) have facts no source confirmed; that's fine to teach from if you're happy with them.` : ""}`);
+      }
+    }
+  }
+
   // One click: research → slides → fact-check, in the background.
   function make(l: Lesson) {
     const upd = (fn: (x: Lesson) => Lesson) => updateLessons((cur) => cur.map((x) => (x.id === l.id ? fn(x) : x)));
@@ -730,7 +776,7 @@ export default function Prep() {
         </div>
       )}
       {lesson && !talk && <button className="talk-open btn solid" onClick={() => setTalk(true)}>talk it through</button>}
-      {lesson && talk && <Talk key={lesson.id} lesson={lesson} course={course} set={set} close={() => setTalk(false)} />}
+      {lesson && talk && <Talk key={lesson.id} lesson={lesson} course={course} set={set} close={() => setTalk(false)} onActions={onActions} />}
 
       {lesson && step === 1 && (
         <p className="mute" style={{ fontSize: 16, marginTop: 14 }}>

@@ -48,7 +48,12 @@ export function addTo(slide: Slide, item: DragItem): Slide {
 /** What still needs checking, sent to /api/check. Museum captions are sourced by the record itself. */
 export function checkItems(slides: Slide[]) {
   return slides
-    .map((s) => ({ id: s.id, text: [s.title, s.body, s.notes && `Speaker notes: ${s.notes}`].filter(Boolean).join("\n") }))
+    .map((s) => ({
+      id: s.id,
+      text: [s.title, s.body, s.notes && `Speaker notes: ${s.notes}`].filter(Boolean).join("\n"),
+      // Sources the slide already carries (from the research document and museum records).
+      sources: s.sources.filter((x) => /^https?:/.test(x.url)).slice(0, 6),
+    }))
     .filter((i) => i.text.trim());
 }
 
@@ -66,13 +71,15 @@ export function applyCheck(slides: Slide[], claims: Claim[], at: string): Slide[
   return slides.map((s) => ({ ...s, check: { at, claims: claims.filter((c) => c.slideId === s.id) } }));
 }
 
-export function readiness(l: Lesson): { ok: boolean; problems: number; unverified: number; unchecked: number; rights: number } {
+/** Where a class stands. `ok` = can be marked ready (any slides at all); `clean` = nothing left to look at.
+ *  Unchecked slides and unverified facts are shown as notes, never as a gate (Asit, Nov 2026). */
+export function readiness(l: Lesson): { ok: boolean; clean: boolean; problems: number; unverified: number; unchecked: number; rights: number } {
   const states = l.slides.map(slideState);
   const rights = l.slides.reduce((n, s) => n + s.images.filter((i) => i.rights === "check").length, 0);
   const problems = states.filter((x) => x === "problem").length;
   const unchecked = states.filter((x) => x === "unchecked").length;
   const unverified = states.filter((x) => x === "unverified").length;
-  return { ok: l.slides.length > 0 && !problems && !unchecked, problems, unverified, unchecked, rights };
+  return { ok: l.slides.length > 0, clean: l.slides.length > 0 && !problems && !unchecked && !unverified, problems, unverified, unchecked, rights };
 }
 
 /** Every source in the deck, for the closing Sources slide. */

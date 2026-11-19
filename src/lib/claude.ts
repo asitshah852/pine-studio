@@ -89,15 +89,28 @@ export function parseJson<T>(text: string): T {
 export function groundSources(
   sources: { title?: string; url?: string }[] | undefined,
   retrieved: Map<string, string>,
+  loose = false,
 ): { title: string; url: string }[] {
   const out: { title: string; url: string }[] = [];
   const seen = new Set<string>();
+  const host = (k: string) => k.split("/")[0];
   for (const s of sources ?? []) {
     if (!s?.url) continue;
     const k = normUrl(s.url);
-    if (!retrieved.has(k) || seen.has(k)) continue;
-    seen.add(k);
-    out.push({ title: s.title || retrieved.get(k) || s.url, url: s.url });
+    if (retrieved.has(k)) {
+      if (!seen.has(k)) out.push({ title: s.title || retrieved.get(k) || s.url, url: s.url });
+      seen.add(k);
+      continue;
+    }
+    // Loose (fact-check): the cited page wasn't fetched exactly, but a page on the same site was —
+    // keep that real, retrieved page as the source.
+    if (loose) {
+      const same = [...retrieved.keys()].find((r) => host(r) === host(k) && !seen.has(r));
+      if (same) {
+        seen.add(same);
+        out.push({ title: retrieved.get(same) || s.title || same, url: `https://${same}` });
+      }
+    }
   }
   return out;
 }
