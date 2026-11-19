@@ -440,3 +440,9 @@ h2 { font-size: 28px; }
 .talk-input .btn { align-self: flex-end; }
 @media (min-width: 1300px) { .page.withtalk { padding-right: 480px; } }
 @media (max-width: 860px) { .talk-panel { width: 100vw; } .talk-open { right: 16px; bottom: 16px; } }
+
+/* video exhibits */
+.slide .si { position: relative; }
+.slide .play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 9cqw; height: 9cqw; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 3.6cqw; padding-left: 0.6cqw; }
+.present .videoframe { width: min(100vw, 177.78vh); aspect-ratio: 16 / 9; border: 0; }
+.present .vcap { position: fixed; top: 14px; left: 0; right: 0; text-align: center; color: #aaa; font-family: var(--serif); font-size: 18px; }

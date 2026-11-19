@@ -38,7 +38,21 @@ function Present({ lesson, close }: { lesson: Lesson; close: () => void }) {
   }, [n]);
   return (
     <div className="present" onClick={() => setI((x) => Math.min(n - 1, x + 1))}>
-      <SlideView s={lesson.slides[i]} n={lesson.number} />
+      {lesson.slides[i].artworks[0]?.video ? (
+        <>
+          <div className="vcap" onClick={(e) => e.stopPropagation()}>{lesson.slides[i].title}</div>
+          <iframe
+            className="videoframe"
+            src={`https://www.youtube-nocookie.com/embed/${lesson.slides[i].artworks[0].video!.id}?rel=0`}
+            title={lesson.slides[i].artworks[0].title}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            onClick={(e) => e.stopPropagation()}
+          />
+        </>
+      ) : (
+        <SlideView s={lesson.slides[i]} n={lesson.number} />
+      )}
       <div className="pnav mono" onClick={(e) => e.stopPropagation()}>
         <button className="btn sm" onClick={() => setI(Math.max(0, i - 1))}>←</button>
         <span>{i + 1} / {n}</span>

@@ -30,7 +30,7 @@ Return ONLY a JSON object (in a \`\`\`json block):
   "overview": "2–3 sentence framing of the class for students (no facts that need a source)",
   "sections": [ { "heading": "section heading", "paragraphs": [ { "text": "2–4 sentences of sourced fact", "sources": [ { "title": "page title", "url": "exact URL you retrieved" } ] } ] } ],   // 4–6 sections, 1–3 paragraphs each
   "questions": [ "open discussion question" ],   // 4–6, no facts needed
-  "exhibits": [ { "artist": "artist name", "title": "exact title of the work", "date": "date", "why": "one sentence on why it fits this class" } ]   // 6–10 works to show; strongly prefer works in the Art Institute of Chicago, The Met or the Cleveland Museum of Art collections, and use the museum's own title
+  "exhibits": [ { "type": "artwork | photograph | video", "artist": "artist name (for a video: the artist or channel)", "title": "exact title of the work or video", "date": "date", "why": "one sentence on why it fits this class" } ]   // 6–10 things to show; for art prefer works in the Art Institute of Chicago, The Met or the Cleveland Museum of Art and use the museum's own title; historic photographs can come from the Library of Congress; for music, film or performance topics include official videos (they are looked up on YouTube)
 }`,
       },
     ],
@@ -39,7 +39,7 @@ Return ONLY a JSON object (in a \`\`\`json block):
     overview?: string;
     sections?: { heading?: string; paragraphs?: { text?: string; sources?: { title?: string; url?: string }[] }[] }[];
     questions?: string[];
-    exhibits?: { artist?: string; title?: string; date?: string; why?: string }[];
+    exhibits?: { type?: string; artist?: string; title?: string; date?: string; why?: string }[];
   };
   const raw = parseJson<Raw>(text);
   const sections = (raw.sections ?? [])
@@ -58,7 +58,7 @@ Return ONLY a JSON object (in a \`\`\`json block):
   const sugg = (raw.exhibits ?? []).filter((e) => e?.title).slice(0, 10);
   const exhibits: ExhibitSuggestion[] = await Promise.all(
     sugg.map(async (e) => {
-      const match = await findWork(String(e.title), String(e.artist ?? ""));
+      const match = await findWork(String(e.title), String(e.artist ?? ""), String((e as { type?: string }).type ?? "artwork"));
       return {
         id: rid(),
         suggested: `${e.artist ? `${e.artist}, ` : ""}${e.title}${e.date ? ` (${e.date})` : ""}`,
@@ -272,7 +272,7 @@ Review it and return ONLY JSON (in a \`\`\`json block):
      "sources": [ { "title": "...", "url": "exact URL you retrieved" } ]   // required for accuracy fixes and any new facts
   } ],   // 6–12 suggestions, most useful first; check her facts and flag anything wrong or outdated as "accuracy"
   "questions": [ "new discussion point or question for students" ],   // 4–6
-  "exhibits": [ { "artist": "...", "title": "exact museum title", "date": "...", "why": "how it would strengthen this class" } ]   // 3–6, prefer the Art Institute of Chicago, The Met, Cleveland Museum of Art
+  "exhibits": [ { "type": "artwork | photograph | video", "artist": "...", "title": "exact title", "date": "...", "why": "how it would strengthen this class" } ]   // 3–6; art from the Art Institute of Chicago, The Met, Cleveland; historic photographs from the Library of Congress; official videos from YouTube
 }`,
       },
     ],
@@ -307,7 +307,7 @@ Review it and return ONLY JSON (in a \`\`\`json block):
     });
   const exhibits: ExhibitSuggestion[] = await Promise.all(
     (raw.exhibits ?? []).filter((e) => e?.title).slice(0, 6).map(async (e) => {
-      const match = await findWork(String(e.title), String(e.artist ?? ""));
+      const match = await findWork(String(e.title), String(e.artist ?? ""), String((e as { type?: string }).type ?? "artwork"));
       return { id: rid(), suggested: `${e.artist ? `${e.artist}, ` : ""}${e.title}${e.date ? ` (${e.date})` : ""}`, why: String(e.why ?? ""), match, use: false };
     }),
   );

@@ -78,13 +78,18 @@ export async function downloadPptx(lesson: Lesson) {
       });
     } else {
       const im = imgs[0];
-      sl.addImage({ data: im.data, ...fit(im.w, im.h, 0.5, 0.5, W * 0.58, H - 1) });
+      const vid = s.artworks[0]?.video;
+      sl.addImage({ data: im.data, ...fit(im.w, im.h, 0.5, 0.5, W * 0.58, H - 1), ...(vid ? { hyperlink: { url: `https://www.youtube.com/watch?v=${vid.id}`, tooltip: "Play on YouTube" } } : {}) });
+      if (vid) sl.addText([{ text: "▶ Play on YouTube", options: { hyperlink: { url: `https://www.youtube.com/watch?v=${vid.id}` } } }], { x: 0.5, y: H - 0.5, w: 4, h: 0.4, fontFace: FONT, fontSize: 12, color: INK });
       const x = W * 0.58 + 0.9;
       const w = W - x - 0.6;
       sl.addText(s.title, { x, y: 0.6, w, h: 1.2, fontFace: FONT, fontSize: 26, color: INK, bold: true, valign: "top" });
       const cap = s.artworks[0] ? caption(s.artworks[0]) : im.meta.credit;
       sl.addText(cap, { x, y: 1.9, w, h: 1.3, fontFace: FONT, fontSize: 11, color: MUTE, valign: "top" });
     }
+    // A video slide always carries its link, even if the thumbnail couldn't be fetched.
+    const v = s.artworks.find((x) => x.video)?.video;
+    if (v && !imgs.length) sl.addText([{ text: "▶ Play on YouTube", options: { hyperlink: { url: `https://www.youtube.com/watch?v=${v.id}` } } }], { x: 0.8, y: H - 1, w: 5, h: 0.5, fontFace: FONT, fontSize: 16, color: INK });
     // Talking points travel with every slide as presenter notes.
     const talk = [bullets.map((b) => `• ${b}`).join("\n"), s.notes].filter(Boolean).join("\n\n");
     if (talk) sl.addNotes(talk);

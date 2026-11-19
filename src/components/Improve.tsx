@@ -223,7 +223,7 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
                       ) : <b>{e.suggested}</b>}
                       <div className="src">{e.match ? `${e.match.artist.split("\n")[0]}${e.match.date ? `, ${e.match.date}` : ""}` : "Not found in the open collections."}</div>
                       {e.why && <div>{e.why}</div>}
-                      {e.match && <div className="src"><a href={e.match.url} target="_blank" rel="noreferrer">{e.match.museum} ↗</a> · {e.match.publicDomain ? "public domain" : "rights: check"}</div>}
+                      {e.match && <div className="src"><a href={e.match.url} target="_blank" rel="noreferrer">{e.match.museum} ↗</a> · {e.match.video ? `YouTube · ${e.match.video.channel}` : e.match.publicDomain ? "free to use" : "rights: check"}</div>}
                     </div>
                   </div>
                 ))}

@@ -33,5 +33,9 @@
 3. **Image rights:** public-domain images freely; in-copyright works only as museum previews,
    flagged "rights: check". Respect each source's terms (e.g. Getty Virtual Library: personal
    study only — link, don't redistribute).
+   Exhibit sources (Asit, Nov 2026): Art Institute of Chicago, The Met, Cleveland (open access);
+   Library of Congress (free to use only when the item's own record says "no known restrictions",
+   otherwise "rights: check"); YouTube (official channels; linked/embedded, never downloaded;
+   searched only on request because of the ~100 searches/day allowance shared with Silent Sheep).
 4. Official APIs only; no scraping against a site's terms.
 5. Never commit secrets.

@@ -113,12 +113,14 @@ export async function searchCleveland(q: string, limit = 12): Promise<Artwork[]>
 
 /** The caption line used on slides, built only from the museum record. */
 export function caption(a: Artwork): string {
+  if (a.video) return `${a.title}. ${a.video.channel} on YouTube${a.date ? `, ${a.date}` : ""}.`;
+  if (a.museum === "Library of Congress") return [a.artist !== "Unknown" ? a.artist : "", `${a.title}${a.date ? `, ${a.date}` : ""}`, a.medium, `Library of Congress${a.credit ? `. ${a.credit}` : ""}`].filter(Boolean).join(". ").replace(/\.\./g, ".");
   const bits = [a.artist, `${a.title}${a.date ? `, ${a.date}` : ""}`, a.medium, `${a.museum}${a.credit ? `. ${a.credit}` : ""}`];
   return bits.filter(Boolean).join(". ").replace(/\.\./g, ".");
 }
 
 // Hosts the image proxy will fetch from (so slides can embed museum images in .pptx).
-export const IMAGE_HOSTS = ["artic.edu", "www.artic.edu", "images.metmuseum.org", "collectionapi.metmuseum.org", "openaccess-cdn.clevelandart.org"];
+export const IMAGE_HOSTS = ["artic.edu", "www.artic.edu", "images.metmuseum.org", "collectionapi.metmuseum.org", "openaccess-cdn.clevelandart.org", "tile.loc.gov", "cdn.loc.gov", "www.loc.gov", "i.ytimg.com"];
 
 // ── Matching a suggested work ("Artist, Title (date)") to a real museum record ──
 const STOP = new Set(["the", "a", "an", "of", "and", "in", "on", "at", "la", "le", "les", "de", "du", "des", "el", "with", "to", "for"]);
@@ -144,9 +146,13 @@ export function isMatch(rec: Artwork, title: string, artist: string): boolean {
 }
 
 /** Look a suggestion up in Chicago, then the Met, then Cleveland. Returns the first good match. */
-export async function findWork(title: string, artist: string): Promise<Artwork | undefined> {
+export async function findWork(title: string, artist: string, type = "artwork"): Promise<Artwork | undefined> {
   const q = `${title} ${artist}`.trim();
-  const tries: (() => Promise<Artwork[]>)[] = [() => searchAIC(q, 8), () => searchMet(q, 4), () => searchCleveland(q, 6)];
+  const { searchLOC, findVideo } = await import("./sources");
+  if (type === "video") return findVideo(title, artist).catch(() => undefined);
+  const museums: (() => Promise<Artwork[]>)[] = [() => searchAIC(q, 8), () => searchMet(q, 4), () => searchCleveland(q, 6)];
+  const loc = () => searchLOC(q, 8);
+  const tries = type === "photograph" ? [loc, ...museums] : [...museums, loc];
   for (const t of tries) {
     try {
       const hit = (await t()).find((r) => isMatch(r, title, artist));

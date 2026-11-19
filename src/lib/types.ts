@@ -13,7 +13,8 @@ export type Claim = {
 };
 
 export type Artwork = {
-  museum: "Art Institute of Chicago" | "The Met" | "Cleveland Museum of Art";
+  museum: "Art Institute of Chicago" | "The Met" | "Cleveland Museum of Art" | "Library of Congress" | "YouTube";
+  video?: { id: string; channel: string }; // YouTube: link and embed only, never downloaded
   id: string;
   title: string;
   artist: string;

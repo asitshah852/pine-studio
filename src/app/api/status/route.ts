@@ -1,6 +1,7 @@
 import { claudeOn } from "@/lib/claude";
 import { dbConfigured } from "@/lib/db";
 import { passcodeSet } from "@/lib/auth";
+import { youtubeOn } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 export function GET() {
@@ -8,6 +9,7 @@ export function GET() {
     claude: claudeOn(),
     db: dbConfigured(),
     passcode: passcodeSet(),
+    youtube: youtubeOn(),
     email: Boolean(process.env.RESEND_API_KEY && process.env.FEEDBACK_EMAIL_TO),
   });
 }

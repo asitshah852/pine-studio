@@ -139,3 +139,26 @@ test("chat changes apply to slides and research, and undo restores them", async 
   assert.deepEqual(back.slides.map((s) => s.title), ["One", "Two"]);
   assert.equal(back.research, undefined);
 });
+
+test("Library of Congress results: images and rights from each item's own record", async () => {
+  const { parseLoc, rightsFrom } = await import("../src/lib/sources");
+  const [a] = parseLoc([{ url: "https://www.loc.gov/item/2017000001/", title: "Example photograph", date: "1936", contributor: ["Example, Photographer"], image_url: ["//tile.loc.gov/x/small.gif", "https://tile.loc.gov/x/a.jpg#h=100&w=80", "https://tile.loc.gov/x/b.jpg#h=1000&w=800"] }]);
+  assert.equal(a.thumbUrl, "https://tile.loc.gov/x/a.jpg");
+  assert.equal(a._big, "https://tile.loc.gov/x/b.jpg");
+  assert.equal(a.publicDomain, false);
+  assert.equal(rightsFrom({ rights_advisory: ["No known restrictions on publication."] }).free, true);
+  assert.equal(rightsFrom({ rights_advisory: "Publication may be restricted." }).free, false);
+  assert.equal(rightsFrom(undefined).free, false);
+});
+
+test("YouTube results become linked video exhibits, never treated as free images", async () => {
+  const { parseYouTube } = await import("../src/lib/sources");
+  const [v] = parseYouTube([{ id: { videoId: "abc123" }, snippet: { title: "Example &amp; Song (Official Video)", channelTitle: "ExampleVEVO", publishedAt: "1981-08-01T00:00:00Z" } }]);
+  assert.equal(v.title, "Example & Song (Official Video)");
+  assert.equal(v.video?.id, "abc123");
+  assert.equal(v.publicDomain, false);
+  assert.equal(caption(v), "Example & Song (Official Video). ExampleVEVO on YouTube, 1981.");
+  const s = slideFrom({ kind: "artwork", artwork: v });
+  assert.equal(s.images[0].rights, "check");
+  assert.equal(s.images[0].url, "https://i.ytimg.com/vi/abc123/hqdefault.jpg");
+});

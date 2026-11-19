@@ -70,12 +70,14 @@ export function ExhibitsPanel({ q, setQ, onAdd, addLabel = "+ Add" }: { q: strin
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [pdOnly, setPdOnly] = useState(false);
+  const [src, setSrc] = useState<"all" | "museums" | "loc" | "youtube">("all");
+  const st = useStatus();
 
   async function search(term = q) {
     if (!term.trim()) return;
     setBusy(true);
     try {
-      const r = await fetch(`/api/museum?q=${encodeURIComponent(term)}`).then((x) => x.json());
+      const r = await fetch(`/api/museum?q=${encodeURIComponent(term)}&src=${src}`).then((x) => x.json());
       setResults(r.results ?? []);
       setErrors(r.errors ?? []);
     } catch (e) {
@@ -87,7 +89,7 @@ export function ExhibitsPanel({ q, setQ, onAdd, addLabel = "+ Add" }: { q: strin
   useEffect(() => {
     if (q) search(q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [q, src]);
 
   const shown = pdOnly ? results.filter((r) => r.publicDomain) : results;
   return (
@@ -97,7 +99,11 @@ export function ExhibitsPanel({ q, setQ, onAdd, addLabel = "+ Add" }: { q: strin
         <button className="btn solid" disabled={busy}>{busy ? "…" : "Search"}</button>
       </form>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <span className="mono mute">Art Institute of Chicago · The Met · Cleveland</span>
+        <span className="row" style={{ gap: 4 }}>
+          {([["all", "museums + library of congress"], ["museums", "museums"], ["loc", "library of congress"], ["youtube", "youtube"]] as const).map(([k, label]) => (
+            <button type="button" key={k} className={`chip ${src === k ? "on" : ""}`} onClick={() => setSrc(k)} disabled={k === "youtube" && st?.youtube === false} title={k === "youtube" && st?.youtube === false ? "Add YOUTUBE_API_KEY in Vercel to switch this on" : ""}>{label}</button>
+          ))}
+        </span>
         <label className="mono mute"><input type="checkbox" checked={pdOnly} onChange={(e) => setPdOnly(e.target.checked)} /> public domain only</label>
       </div>
       {errors.length > 0 && <div className="note">Couldn’t reach: {errors.join("; ")}</div>}
@@ -106,7 +112,7 @@ export function ExhibitsPanel({ q, setQ, onAdd, addLabel = "+ Add" }: { q: strin
           <div key={`${a.museum}-${a.id}`} className="ex grab" draggable onDragStart={(e) => startDrag(e, { kind: "artwork", artwork: a })}>
             <div className="photo">
               {a.thumbUrl ? <img src={proxied(a.thumbUrl)} alt="" loading="lazy" /> : <div className="ph" style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>no image</div>}
-              <span className="rights mono" style={{ fontSize: 12 }}>{a.publicDomain ? "PD" : "©?"}</span>
+              <span className="rights mono" style={{ fontSize: 12 }}>{a.video ? "▶ video" : a.publicDomain ? "PD" : "©?"}</span>
             </div>
             <b>{a.title}</b>
             <span className="mute">{a.artist.split("\n")[0]}{a.date && `, ${a.date}`}</span>
@@ -118,7 +124,7 @@ export function ExhibitsPanel({ q, setQ, onAdd, addLabel = "+ Add" }: { q: strin
         ))}
       </div>
       {!busy && q && !shown.length && !errors.length && <div className="empty">No works found.</div>}
-      <p className="mute" style={{ fontSize: 15, margin: 0 }}>PD = public domain: full image goes into the deck. ©? = still in copyright: a small preview is used and flagged “rights: check” (classroom fair use is usually fine; posting online may not be).</p>
+      <p className="mute" style={{ fontSize: 15, margin: 0 }}>PD = public domain or no known restrictions: the full image goes into the deck. ©? = still in copyright: a small preview is used and flagged “rights: check” (classroom fair use is usually fine; posting online may not be). ▶ = YouTube video: linked and played from YouTube, never downloaded — use official channels.</p>
     </div>
   );
 }

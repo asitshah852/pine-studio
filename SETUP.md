@@ -11,8 +11,9 @@ email or GitHub — only into Vercel's settings.
 3. **Saving across devices:** Vercel → the project → **Storage → Create → Upstash (Redis)** →
    connect to the project (it adds the two `KV_…` settings itself).
 4. **Passcode:** add `APP_PASSCODE` = any phrase. Give it to Tanya; the site asks once per device.
-5. **Optional email of feedback notes:** `RESEND_API_KEY` and `FEEDBACK_EMAIL_TO`.
-6. **Deployments → ⋯ → Redeploy** so the new settings take effect.
+5. **YouTube exhibits:** add `YOUTUBE_API_KEY` (copy it from the Silent Sheep project: pp-studio-pyzt → Settings → Environment Variables). The Library of Congress needs no key.
+6. **Optional email of feedback notes:** `RESEND_API_KEY` and `FEEDBACK_EMAIL_TO`.
+7. **Deployments → ⋯ → Redeploy** so the new settings take effect.
 
 **Check it worked:** the top-right dot reads **research on**, and the Prep page footer says
 "shared across your devices".

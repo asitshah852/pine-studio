@@ -21,6 +21,7 @@ export default function SlideView({ s, n }: { s: Slide; n?: number }) {
         <>
           <div className="si">
             {s.images[0] ? <img src={src(s.images[0].url)} alt={s.images[0].credit} /> : <div className="ph">Drop an artwork here</div>}
+            {s.artworks[0]?.video && <span className="play" aria-hidden="true">▶</span>}
           </div>
           <div className="cap">{s.artworks[0] ? caption(s.artworks[0]) : s.images[0]?.credit}</div>
         </>

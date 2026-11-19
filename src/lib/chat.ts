@@ -3,7 +3,8 @@
 // slides through tools. The changes are returned as operations; the browser applies them (with undo).
 import type Anthropic from "@anthropic-ai/sdk";
 import { MODEL, claudeOn, getClient, groundSources, NoClaude, normUrl } from "./claude";
-import { caption, searchAIC, searchCleveland, searchMet } from "./museum";
+import { caption } from "./museum";
+import { searchSources } from "./search";
 import { HOUSE } from "./prompts";
 import type { Artwork, ChatOp, Lesson, Source } from "./types";
 
@@ -19,7 +20,7 @@ const layout = { type: "string", enum: ["title", "text", "artwork", "compare"] }
 
 const TOOLS: B[] = [
   { type: "web_search_20260209", name: "web_search", max_uses: 5 },
-  tool("find_exhibits", "Search the open collections of the Art Institute of Chicago, The Met and the Cleveland Museum of Art. Returns works with a ref to use in add_exhibit.", { query: { ...str, description: "artist, title, movement or subject" } }, ["query"]),
+  tool("find_exhibits", "Find exhibits: art in the Art Institute of Chicago, The Met and the Cleveland Museum of Art; historic photographs, posters and prints in the Library of Congress; or videos on YouTube (official channels only — use sparingly, each search uses part of a small daily allowance). Returns items with a ref to use in add_exhibit.", { query: { ...str, description: "artist, title, movement or subject" }, source: { type: "string", enum: ["all", "museums", "library_of_congress", "youtube"], description: "all = museums + Library of Congress" } }, ["query", "source"]),
   tool("add_exhibit", "Add a work found with find_exhibits to the class's exhibit list, and optionally put it on a slide.", { ref: str, why: { ...str, description: "one sentence: why it fits this class" }, slide_id: { ...str, description: "slide to place it on, or empty" } }, ["ref", "why", "slide_id"]),
   tool("edit_slide", "Change a slide's title, talking points (3–5 short bullets, one per line) or layout. Leave a field empty to keep it.", { slide_id: str, title: str, talking_points: str, layout: { ...layout, description: "or empty" } }, ["slide_id", "title", "talking_points", "layout"]),
   tool("add_slide", "Add a new slide after the given slide (empty = at the end).", { after_slide_id: str, title: str, talking_points: str, layout }, ["after_slide_id", "title", "talking_points", "layout"]),
@@ -39,7 +40,7 @@ const SYSTEM = `${HOUSE}
 
 You are now talking with Tanya inside her prep tool about one class. Be a warm, sharp colleague: discuss ideas, answer questions, and when she asks for changes, make them with the tools (don't just describe them). Keep replies short (a few sentences) and say plainly what you changed.
 - Facts in your replies or in anything you add must come from web_search results in this conversation; cite them. If you can't source something, say so.
-- Exhibits only come from find_exhibits (real museum records). Never invent a work or a museum record.
+- Exhibits only come from find_exhibits (real museum, Library of Congress or YouTube records). Never invent a work, record or video. For YouTube, prefer official artist, label or museum channels and say which channel it is.
 - Talking points: 3–5 short bullets in plain spoken language; on exhibit slides they link the research to the work on screen.
 - Refer to slides by their number, not their id.`;
 
@@ -112,11 +113,13 @@ export async function chat(input: { lesson: Lesson; course: string; history: { r
           case "find_exhibits": {
             const q = s(a.query);
             if (!q) { bad("Empty query."); break; }
-            const lists = await Promise.allSettled([searchAIC(q, 6), searchMet(q, 4), searchCleveland(q, 4)]);
-            const works = lists.flatMap((x) => (x.status === "fulfilled" ? x.value : []));
-            const ref = (w: Artwork) => `${w.museum === "The Met" ? "met" : w.museum === "Cleveland Museum of Art" ? "cma" : "aic"}:${w.id}`;
+            const src = s(a.source) === "youtube" ? "youtube" : s(a.source) === "library_of_congress" ? "loc" : s(a.source) === "museums" ? "museums" : "all";
+            const { results, errors } = await searchSources(q, src);
+            const works = results.slice(0, 14);
+            if (!works.length && errors.length) { bad(errors.join("; ")); break; }
+            const ref = (w: Artwork) => `${({ "The Met": "met", "Cleveland Museum of Art": "cma", "Library of Congress": "loc", YouTube: "yt", "Art Institute of Chicago": "aic" } as const)[w.museum]}:${w.id}`;
             works.forEach((w) => found.set(ref(w), w));
-            ok(works.length ? works.map((w) => `ref ${ref(w)} — ${caption(w)} — ${w.publicDomain ? "public domain" : "in copyright (preview only)"}`).join("\n") : "No works found. Try different words.");
+            ok(works.length ? works.map((w) => `ref ${ref(w)} — ${caption(w)} — ${w.video ? `YouTube video, channel “${w.video.channel}” (${w.credit})` : w.publicDomain ? "free to use" : "rights to check (preview only)"}`).join("\n") : "No works found. Try different words.");
             break;
           }
           case "add_exhibit": {
