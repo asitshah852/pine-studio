@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, readAsBase64, shrinkImage, useStatus } from "@/lib/client";
 import type { Claim } from "@/lib/types";
 import Claims from "./Claims";
+import Working from "./Working";
 
 type Up = { kind: "image" | "pdf"; data: string; name: string; preview?: string };
 const MAX = 3_800_000;
@@ -75,9 +76,10 @@ export default function Checker() {
             </div>
           )}
           <div className="row">
-            <button className="btn solid" disabled={busy || (!text.trim() && !ups.length) || st?.claude === false} onClick={run}>{busy ? "Checking… (1–2 min)" : "Check"}</button>
+            <button className="btn solid" disabled={busy || (!text.trim() && !ups.length) || st?.claude === false} onClick={run}>{busy ? "checking…" : "check"}</button>
             {st?.claude === false && <span className="mute" style={{ fontSize: 16 }}>Needs the Claude key (see SETUP.md).</span>}
           </div>
+          {busy && <Working what="Fact-checking" doing="Searching the web to check every name, date and claim" usual="1–3 minutes" />}
           {err && <div className="err">{err}</div>}
           <div className="note">
             <b>What it can’t do:</b> judge opinions or interpretation; confirm facts no public page covers (it marks those “?”); read PowerPoint files directly (save as PDF). It’s a second pair of eyes, not a replacement for yours.

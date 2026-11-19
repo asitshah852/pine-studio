@@ -6,6 +6,8 @@ import { loadText } from "@/lib/files";
 import { ACCEPT, importFile } from "@/lib/importers";
 import { applySuggestion, discussionSlide } from "@/lib/slides";
 import { pad } from "@/lib/studio";
+import Working from "./Working";
+import { useJob } from "@/lib/jobs";
 import type { Lesson, Material, ReviewDoc, Slide, Suggestion } from "@/lib/types";
 
 const KIND: Record<Suggestion["kind"], string> = {
@@ -47,9 +49,11 @@ export function UploadButton({ label, onFiles, busy }: { label: string; onFiles:
 
 export default function Improve({ lesson, course, set, autoRun }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; autoRun?: boolean }) {
   const st = useStatus();
-  const [busy, setBusy] = useState(false);
+  const job = useJob(`review:${lesson.id}`);
+  const busy = job.running;
   const [uploading, setUploading] = useState("");
-  const [err, setErr] = useState("");
+  const [upErr, setErr] = useState("");
+  const err = upErr || job.error;
   const [open, setOpen] = useState<string | null>(null);
   const [full, setFull] = useState<Record<string, string>>({});
   const [picked, setPicked] = useState<number[]>([]);
@@ -60,9 +64,9 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
 
   async function run() {
     if (rv && !confirm("Replace the current suggestions with a fresh review?")) return;
-    setBusy(true);
     setErr("");
-    try {
+    job.clearError();
+    await job.run(async () => {
       const materials = await Promise.all(mats.map(async (m) => ({ name: m.name, text: await loadText(m.fileId, m.preview) })));
       const r = await api<ReviewDoc>("/api/review", {
         method: "POST",
@@ -76,15 +80,11 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
         }),
       });
       set((l) => ({ ...l, review: r }));
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   useEffect(() => {
-    if (autoRun && !started.current && st?.claude && !rv && (lesson.slides.length || mats.length)) {
+    if (autoRun && !started.current && st?.claude && !rv && !busy && (lesson.slides.length || mats.length)) {
       started.current = true;
       run();
     }
@@ -119,13 +119,15 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
         <div className="row">
           <UploadButton label="+ add materials" onFiles={upload} busy={uploading} />
           <button className="btn solid" disabled={busy || st?.claude === false || (!lesson.slides.length && !mats.length)} onClick={run}>
-            {busy ? "Reviewing… (2–3 min)" : rv ? "review again" : "suggest improvements"}
+            {busy ? "reviewing…" : rv ? "review again" : "suggest improvements"}
           </button>
         </div>
       </div>
       <p className="mute" style={{ marginTop: 6 }}>
         Reads your {lesson.slides.length} slide(s){mats.length ? ` and ${mats.length} file(s)` : ""}, checks the facts, and suggests changes, new discussion points and exhibits. You choose what to keep.
       </p>
+      {busy && <Working since={job.started} what="Reviewing your class" doing="Reading your slides and materials, checking the facts, and finding discussion points and museum exhibits" usual="2–3 minutes" />}
+      {uploading && <Working what="Bringing in your files" doing={uploading} usual="a few seconds per file" />}
       {err && <div className="err">{err}</div>}
 
       {mats.length > 0 && (

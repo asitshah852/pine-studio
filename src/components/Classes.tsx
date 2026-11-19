@@ -16,6 +16,7 @@ import { uid } from "@/lib/client";
 import type { Lesson, Resource } from "@/lib/types";
 import Improve, { importAll, UploadButton } from "./Improve";
 import Renamable from "./Renamable";
+import Working from "./Working";
 import SlideView from "./SlideView";
 
 function Present({ lesson, close }: { lesson: Lesson; close: () => void }) {
@@ -274,6 +275,7 @@ export default function Classes() {
                   <input type="file" multiple accept={ACCEPT} className="hide" onChange={(e) => setEx({ ...ex, files: [...ex.files, ...Array.from(e.target.files ?? [])] })} />
                   {ex.files.length ? ex.files.map((f) => f.name).join(" · ") : "Drop your files here — PowerPoint (.pptx), PDF, Word (.docx), images — or click to choose"}
                 </label>
+                {progress && <Working what="Bringing in your class" doing={progress} usual="a few seconds per file" />}
                 {exErr && <div className="err">{exErr}</div>}
                 <div className="row">
                   <button className="btn solid" disabled={!ex.files.length || !!progress}>{progress || "add class"}</button>

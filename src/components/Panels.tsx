@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, proxied, readAsBase64, shrinkImage, useStatus } from "@/lib/client";
 import { startDrag } from "@/lib/drag";
+import Working from "./Working";
 import type { Artwork, Lesson, Resource, TextbookPoint } from "@/lib/types";
 
 const MAX_UPLOAD = 3_800_000; // the host accepts ~4.5 MB per request
@@ -47,7 +48,8 @@ export function TextbookPanel({ books }: { books: Resource[] }) {
       </label>
       {!file && <textarea className="area" value={text} onChange={(e) => setText(e.target.value)} placeholder="…or paste the passage here" />}
       <input className="input" value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="What to pull out (optional): e.g. key terms and 3 works to show" />
-      <button className="btn solid" disabled={busy || (!file && !text.trim()) || st?.claude === false} onClick={run}>{busy ? "Reading…" : "Pull out points"}</button>
+      <button className="btn solid" disabled={busy || (!file && !text.trim()) || st?.claude === false} onClick={run}>{busy ? "reading…" : "pull out points"}</button>
+      {busy && <Working what="Reading the pages" doing="Pulling out key points with page numbers and exact quotes" usual="under a minute" />}
       {err && <div className="err">{err}</div>}
       {points.map((p, i) => {
         const src = { title: `${book || "Textbook"}${p.page ? `, p. ${p.page}` : ""}`, url: res?.url || `book:${book}${p.page ? `#p${p.page}` : ""}` };

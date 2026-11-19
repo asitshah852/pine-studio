@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, proxied, uid, useCollection, useStatus } from "@/lib/client";
 import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
+import { useJob } from "@/lib/jobs";
 import { caption } from "@/lib/museum";
 import { downloadPptx } from "@/lib/pptx";
 import { addTo, blankSlide, checkItems, readiness, slideFrom, slideState } from "@/lib/slides";
@@ -14,6 +15,7 @@ import { OTHER, pad, useStudio } from "@/lib/studio";
 import type { Artwork, Claim, Lesson, ResearchDoc, Resource, Slide } from "@/lib/types";
 import Claims from "./Claims";
 import Improve from "./Improve";
+import Working from "./Working";
 import { ExhibitsPanel, FilesPanel, LibraryPanel, TextbookPanel } from "./Panels";
 import SlideView from "./SlideView";
 
@@ -92,8 +94,9 @@ function Brief({ lesson, preset, onSave, onNext }: { lesson: Lesson | null; pres
 
 function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; onNext: () => void }) {
   const st = useStatus();
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+  const job = useJob(`research:${lesson.id}`);
+  const busy = job.running;
+  const err = job.error;
   const [editing, setEditing] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const doc = lesson.research;
@@ -101,16 +104,11 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
 
   async function run() {
     if (doc && !confirm("Replace the current research document with a new one?")) return;
-    setBusy(true);
-    setErr("");
-    try {
+    job.clearError();
+    await job.run(async () => {
       const r = await api<ResearchDoc>("/api/research", { method: "POST", body: JSON.stringify({ topic: lesson.topic, premise: lesson.premise, course }) });
       set((l) => ({ ...l, research: r }));
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   if (!doc)
@@ -123,9 +121,10 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
         </p>
         {lesson.premise && <p className="mute" style={{ margin: 0 }}>Premise: {lesson.premise}</p>}
         <div className="row">
-          <button className="btn solid" disabled={busy || st?.claude === false} onClick={run}>{busy ? "Researching… (2–3 min)" : "Research this class"}</button>
+          <button className="btn solid" disabled={busy || st?.claude === false} onClick={run}>{busy ? "researching…" : "research this class"}</button>
           <button className="btn ghost" onClick={onNext}>Skip — make slides by hand</button>
         </div>
+        {busy && <Working since={job.started} what="Researching" doing="Searching museum, Smarthistory and scholarly pages, writing the document, then matching exhibits to museum records" usual="2–3 minutes" />}
         {st?.claude === false && <div className="note">Research is off until the Claude key is added in Vercel.</div>}
         {err && <div className="err">{err}</div>}
       </div>
@@ -141,10 +140,11 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
           <span className="mono mute">Research document · {doc.at.slice(0, 10)}{unsourced ? ` · ${unsourced} paragraph(s) to check` : " · all sourced"}</span>
           <div className="row">
             <button className="btn sm ghost" onClick={() => downloadDocx(lesson, course)}>Word ↓</button>
-            <button className="btn sm ghost" disabled={busy} onClick={run}>{busy ? "Researching…" : "Redo"}</button>
+            <button className="btn sm ghost" disabled={busy} onClick={run}>{busy ? "researching…" : "redo"}</button>
             <button className="btn sm ghost" onClick={() => confirm("Delete this research document?") && set((l) => ({ ...l, research: undefined }))}>Delete</button>
           </div>
         </div>
+        {busy && <Working since={job.started} what="Researching again" doing="Searching museum, Smarthistory and scholarly pages, writing a new document, then matching exhibits" usual="2–3 minutes" />}
         {err && <div className="err">{err}</div>}
         <textarea className="area plain lead" value={doc.overview} onChange={(e) => setDoc((d) => ({ ...d, overview: e.target.value }))} rows={3} />
         {doc.sections.map((s) => (
@@ -243,8 +243,9 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
   const [q, setQ] = useState("");
   const [over, setOver] = useState<string | null>(null);
   const [count, setCount] = useState(12);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+  const job = useJob(`slides:${lesson.id}`);
+  const busy = job.running;
+  const err = job.error;
   const slide = lesson.slides.find((s) => s.id === sel) ?? lesson.slides[0] ?? null;
   const setSlides = (fn: (s: Slide[]) => Slide[]) => set((l) => ({ ...l, slides: fn(l.slides) }));
   const setSlide = (id: string, fn: (s: Slide) => Slide) => setSlides((ss) => ss.map((s) => (s.id === id ? fn(s) : s)));
@@ -257,17 +258,12 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
 
   async function auto() {
     if (lesson.slides.length && !confirm("Replace the current slides with new ones made from the research?")) return;
-    setBusy(true);
-    setErr("");
-    try {
+    job.clearError();
+    await job.run(async () => {
       const r = await api<{ slides: Slide[] }>("/api/slides", { method: "POST", body: JSON.stringify({ course, number: lesson.number, topic: lesson.topic, premise: lesson.premise, doc: lesson.research, count }) });
       set((l) => ({ ...l, slides: r.slides }));
       setSel(r.slides[0]?.id ?? null);
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   function dropOnStrip(e: React.DragEvent, at?: number) {
@@ -301,7 +297,7 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
             {[8, 12, 16, 20].map((n) => <option key={n} value={n}>about {n} slides</option>)}
           </select>
           <button className={`btn ${lesson.slides.length ? "ghost" : "solid"}`} disabled={busy || st?.claude === false} onClick={auto}>
-            {busy ? "Making slides… (1–2 min)" : lesson.slides.length ? "Remake from research" : "Make slides from research"}
+            {busy ? "making slides…" : lesson.slides.length ? "remake from research" : "make slides from research"}
           </button>
         </>
       ) : <span className="mute" style={{ fontSize: 16 }}>No research yet — build slides by hand, or do Step 2 first.</span>}
@@ -315,6 +311,7 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
         <h2>Slides</h2>
         <p style={{ margin: 0 }}>Turns the research document into a deck: slide titles, short talking points on each slide, plain-language speaker notes underneath, and your {chosen.length} chosen exhibit(s) placed where they fit. Nothing is added that isn’t in the document.</p>
         {maker}
+        {busy && <Working since={job.started} what="Making slides" doing="Turning the research document into slides with talking points, speaker notes and your exhibits" usual="1–2 minutes" />}
         {err && <div className="err">{err}</div>}
       </div>
     );
@@ -325,6 +322,7 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
         {maker}
         <span className="mono mute">{lesson.slides.length} slides</span>
       </div>
+      {busy && <Working since={job.started} what="Remaking slides" doing="Turning the research document into slides with talking points, speaker notes and your exhibits" usual="1–2 minutes" />}
       {err && <div className="err" style={{ marginBottom: 12 }}>{err}</div>}
       <div className="bench slides">
         {slide && (
@@ -421,7 +419,8 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
 function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void }) {
   const router = useRouter();
   const st = useStatus();
-  const [busy, setBusy] = useState(false);
+  const job = useJob(`check:${lesson.id}`);
+  const busy = job.running;
   const [pptx, setPptx] = useState(false);
   const [err, setErr] = useState("");
   const r = readiness(lesson);
@@ -433,15 +432,11 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
     const ids = new Set(targets.map((t) => t.id));
     const at = new Date().toISOString();
     if (!items.length) return set((l) => ({ ...l, slides: l.slides.map((s) => (ids.has(s.id) ? { ...s, check: { at, claims: [] } } : s)) }));
-    setBusy(true);
-    try {
+    job.clearError();
+    await job.run(async () => {
       const res = await api<{ claims: Claim[]; at: string }>("/api/check", { method: "POST", body: JSON.stringify({ items }) });
       set((l) => ({ ...l, checkedAt: res.at, slides: l.slides.map((s) => (ids.has(s.id) ? { ...s, check: { at: res.at, claims: res.claims.filter((c) => c.slideId === s.id) } } : s)) }));
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -454,10 +449,11 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
           {r.rights > 0 && <span className="mute">{r.rights} image(s): rights to check</span>}
         </div>
         <div className="row">
-          <button className="btn" disabled={busy || st?.claude === false || !lesson.slides.length} onClick={() => check(false)}>{busy ? "Checking… (1–2 min)" : r.unchecked ? `Fact-check ${r.unchecked} slide(s)` : "Re-check all"}</button>
+          <button className="btn" disabled={busy || st?.claude === false || !lesson.slides.length} onClick={() => check(false)}>{busy ? "checking…" : r.unchecked ? `fact-check ${r.unchecked} slide(s)` : "re-check all"}</button>
         </div>
       </div>
-      {err && <div className="err">{err}</div>}
+      {busy && <Working since={job.started} what="Fact-checking" doing="Searching the web to check every name, date and claim on your slides" usual="1–3 minutes" />}
+      {(err || job.error) && <div className="err">{err || job.error}</div>}
       <div className="list">
         {lesson.slides.map((s, i) => {
           const state = slideState(s);
