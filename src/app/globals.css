@@ -548,3 +548,7 @@ h2 { font-size: 28px; }
 .savedtag:hover { background: var(--ink); color: var(--bg); }
 .savedtag.static { margin-left: 0; vertical-align: 1px; }
 .savedsum { margin: 6px 0 0; font-size: 17px; }
+
+.pdfstatus { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 17px; color: var(--ink2); }
+.pdfstatus.error { color: var(--safelight); display: block; }
+.spinner.tiny { width: 14px; height: 14px; flex: 0 0 14px; border-width: 1.5px; }
