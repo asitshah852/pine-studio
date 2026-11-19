@@ -73,13 +73,13 @@ export async function downloadPptx(lesson: Lesson) {
       const colW = (W - 1.8) / 2;
       imgs.slice(0, 2).forEach((im, i) => {
         const x = 0.6 + i * (colW + 0.6);
-        sl.addImage({ data: im.data, ...fit(im.w, im.h, x, 1.15, colW, H - 2.5) });
+        sl.addImage({ data: im.data, altText: im.meta.credit, ...fit(im.w, im.h, x, 1.15, colW, H - 2.5) });
         sl.addText(im.meta.credit, { x, y: H - 1.25, w: colW, h: 0.9, fontFace: FONT, fontSize: 10, color: MUTE, valign: "top" });
       });
     } else {
       const im = imgs[0];
       const vid = s.artworks[0]?.video;
-      sl.addImage({ data: im.data, ...fit(im.w, im.h, 0.5, 0.5, W * 0.58, H - 1), ...(vid ? { hyperlink: { url: `https://www.youtube.com/watch?v=${vid.id}`, tooltip: "Play on YouTube" } } : {}) });
+      sl.addImage({ data: im.data, altText: im.meta.credit, ...fit(im.w, im.h, 0.5, 0.5, W * 0.58, H - 1), ...(vid ? { hyperlink: { url: `https://www.youtube.com/watch?v=${vid.id}`, tooltip: "Play on YouTube" } } : {}) });
       if (vid) sl.addText([{ text: "▶ Play on YouTube", options: { hyperlink: { url: `https://www.youtube.com/watch?v=${vid.id}` } } }], { x: 0.5, y: H - 0.5, w: 4, h: 0.4, fontFace: FONT, fontSize: 12, color: INK });
       const x = W * 0.58 + 0.9;
       const w = W - x - 0.6;

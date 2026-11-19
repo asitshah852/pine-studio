@@ -3,7 +3,7 @@
 // step or page; this remembers which are running so the "working" circle shows when she returns.
 import { useEffect, useState } from "react";
 
-type Job = { started: number; error?: string };
+type Job = { started: number; error?: string; stage?: string };
 const jobs = new Map<string, Job>();
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((f) => f());
@@ -21,6 +21,14 @@ export function useJob(key: string) {
   return {
     running: !!job && !job.error,
     started: job?.started,
+    stage: job?.stage ?? "",
+    setStage: (stage: string) => {
+      const j = jobs.get(key);
+      if (j) {
+        jobs.set(key, { ...j, stage });
+        emit();
+      }
+    },
     error: job?.error ?? "",
     clearError: () => {
       if (jobs.get(key)?.error) {
@@ -83,4 +91,24 @@ export async function recover(key: string, apply: (data: unknown, meta: unknown)
   } else jobs.set(key, { started: 0, error: r?.error || "That job didn't finish. Please try again." });
   emit();
   forget(key);
+}
+
+/** Run a job outside a component (e.g. "make my class"), with a stage label the page can show. */
+export async function runJob(key: string, fn: (stage: (s: string) => void) => Promise<void>) {
+  if (jobs.get(key) && !jobs.get(key)!.error) return;
+  jobs.set(key, { started: Date.now() });
+  emit();
+  try {
+    await fn((stage) => {
+      const j = jobs.get(key);
+      if (j) {
+        jobs.set(key, { ...j, stage });
+        emit();
+      }
+    });
+    jobs.delete(key);
+  } catch (e) {
+    jobs.set(key, { started: 0, error: (e as Error).message });
+  }
+  emit();
 }

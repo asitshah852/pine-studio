@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { uid, useCollection } from "@/lib/client";
 import { STARTER_RESOURCES, findLinks } from "@/lib/starter";
 import type { Resource, ResourceKind } from "@/lib/types";
@@ -26,6 +26,10 @@ export default function Library() {
   const [form, setForm] = useState(blank);
   const [editing, setEditing] = useState<string | null>(null);
   const [openFind, setOpenFind] = useState<string | null>(null);
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("q");
+    if (v) setQ(v);
+  }, []);
 
   const shown = useMemo(() => {
     const t = q.toLowerCase();

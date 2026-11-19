@@ -12,7 +12,7 @@ Rules you never break:
 - If you can't source something, leave it out or mark it unverified. Never fill a gap with a plausible guess.
 - Write for 18–20 year-old non-majors: plain, vivid, no jargon without a one-line explanation.`;
 
-export async function research(topic: string, premise: string, course: string): Promise<ResearchDoc> {
+export async function research(topic: string, premise: string, course: string, minutes?: number): Promise<ResearchDoc> {
   const { text, retrieved } = await ask({
     system: HOUSE,
     search: 12,
@@ -21,7 +21,7 @@ export async function research(topic: string, premise: string, course: string): 
       {
         type: "text",
         text: `Write the research document for a class in "${course || "Art Appreciation"}".
-Topic: "${topic}".${premise ? `\nHer premise / angle: ${premise}` : ""}
+Topic: "${topic}".${premise ? `\nHer premise / angle: ${premise}` : ""}${minutes ? `\nThe class is ${minutes} minutes long.` : ""}
 
 The document is 1–2 pages (about 700–1,000 words) that she can teach from and keep: clear sections, plain language, every factual sentence sourced.
 
@@ -85,6 +85,7 @@ export async function makeSlides(input: {
   premise: string;
   doc: ResearchDoc;
   count: number;
+  minutes?: number;
 }): Promise<Slide[]> {
   const paras = input.doc.sections.flatMap((s) => s.paragraphs.map((p) => ({ ...p, heading: s.heading })));
   const works = input.doc.exhibits.filter((e) => e.use && e.match);
@@ -108,7 +109,7 @@ ${workText || "(none)"}
 
 DISCUSSION QUESTIONS: ${input.doc.questions.join(" | ")}
 
-Structure: a title slide; content slides that follow the document's order; exhibit slides where the works fit; a closing "Discuss" slide with 2–3 of the questions.
+Structure: a title slide; content slides that follow the document's order; exhibit slides where the works fit; a closing "Discuss" slide with 2–3 of the questions.${input.minutes ? ` The class is ${input.minutes} minutes: include about one short in-class activity slide (slow looking, pair talk, quick sketch, vote) for every 25 minutes, spaced through the deck.` : ""}
 
 Each slide gets ONE set of talking points for her: 3–5 short bullets in plain, spoken language. On exhibit slides, the bullets connect the research to the work on screen — what to point out in it and why it matters for the topic (e.g. "Point to the flat, cut-out figures — that's the poster look MTV borrowed"). On text slides, they are the key ideas.
 

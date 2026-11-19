@@ -98,6 +98,7 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
           <button className="btn solid" onClick={() => setPresenting(true)} disabled={!lesson.slides.length}>Present</button>
           <button className="btn" disabled={busy || !lesson.slides.length} onClick={async () => { setBusy(true); try { await downloadPptx(lesson); } finally { setBusy(false); } }}>{busy ? "Building…" : "PowerPoint ↓"}</button>
           {doc && <button className="btn" onClick={() => downloadDocx(lesson, course)}>Document ↓</button>}
+          <a className="btn" href={`/handout/${lesson.id}`} target="_blank" rel="noreferrer">Handout ↓</a>
           <Link className="btn ghost" href={`/prep?lesson=${lesson.id}&improve=1`}>suggest improvements</Link>
           <UploadButton label="+ add materials" onFiles={upload} busy={uploading} />
           <Link className="btn ghost" href={`/prep?lesson=${lesson.id}`}>Edit in Prep</Link>
@@ -201,6 +202,42 @@ export default function Classes() {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [existing, setExisting] = useState<string | null>(null); // course id with the "existing class" form open
+  const [dragL, setDragL] = useState<string | null>(null);
+  const [overL, setOverL] = useState<string | null>(null);
+  const [copyFor, setCopyFor] = useState<string | null>(null);
+
+  // Drag a class to a new place in its course; classes are renumbered 1, 2, 3… in the new order.
+  function dropClass(targetId: string) {
+    const from = dragL;
+    setDragL(null);
+    setOverL(null);
+    if (!from || from === targetId) return;
+    updateLessons((cur) => {
+      const a = cur.find((x) => x.id === from);
+      const b = cur.find((x) => x.id === targetId);
+      if (!a || !b || a.courseId !== b.courseId) return cur;
+      const inCourse = cur.filter((x) => x.courseId === a.courseId).sort((x, y) => x.number - y.number);
+      const without = inCourse.filter((x) => x.id !== from);
+      const at = without.findIndex((x) => x.id === targetId);
+      const fromIdx = inCourse.findIndex((x) => x.id === from);
+      const toIdx = inCourse.findIndex((x) => x.id === targetId);
+      without.splice(fromIdx < toIdx ? at + 1 : at, 0, a);
+      const num = new Map(without.map((x, i) => [x.id, i + 1]));
+      return cur.map((x) => (num.has(x.id) && num.get(x.id) !== x.number ? { ...x, number: num.get(x.id)! } : x));
+    });
+  }
+
+  // Copy a class (slides, research, materials) into another course as its next class, in prep.
+  function copyTo(lessonId: string, courseId: string) {
+    setCopyFor(null);
+    updateLessons((cur) => {
+      const src = cur.find((x) => x.id === lessonId);
+      if (!src) return cur;
+      const n = Math.max(0, ...cur.filter((x) => x.courseId === courseId).map((x) => x.number)) + 1;
+      const copy = { ...src, id: uid(), courseId, number: n, status: "draft" as const, readyAt: undefined, chat: [], versions: [], example: false, slides: src.slides.map((sl) => ({ ...sl, id: uid() })) };
+      return [...cur, copy];
+    });
+  }
   const [ex, setEx] = useState<{ number: number; topic: string; files: File[] }>({ number: 1, topic: "", files: [] });
   const [progress, setProgress] = useState("");
   const [exErr, setExErr] = useState("");
@@ -244,7 +281,7 @@ export default function Classes() {
       <div className="head">
         <div>
           <h1>Classes</h1>
-          <p>Your courses and their classes. Open a class to present it or download it; add classes inside each course. Right-click a name to rename it.</p>
+          <p>Your courses and their classes. Open a class to present it or download it. Drag a class up or down to change its order; right-click a name to rename it.</p>
         </div>
         <div className="row">
           <button className="btn solid" onClick={() => setAdding(true)}>+ new course</button>
@@ -303,7 +340,14 @@ export default function Classes() {
             {ls.length ? (
               <div className="classrows">
                 {ls.map((l) => (
-                  <div key={l.id} className="classrow" role="link" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") { setOpen(l.id); router.replace(`/classes?open=${l.id}`); } }} onClick={() => { setOpen(l.id); router.replace(`/classes?open=${l.id}`); }}>
+                  <div key={l.id} className={`classrow ${dragL === l.id ? "dragging" : ""} ${overL === l.id && dragL !== l.id ? "over" : ""}`} role="link" tabIndex={0}
+                    draggable
+                    onDragStart={(e) => { setDragL(l.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/x-pine-class", l.id); }}
+                    onDragOver={(e) => { if (dragL && ls.some((x) => x.id === dragL)) { e.preventDefault(); setOverL(l.id); } }}
+                    onDragLeave={() => setOverL((o) => (o === l.id ? null : o))}
+                    onDrop={(e) => { e.preventDefault(); dropClass(l.id); }}
+                    onDragEnd={() => { setDragL(null); setOverL(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { setOpen(l.id); router.replace(`/classes?open=${l.id}`); } }} onClick={() => { setOpen(l.id); router.replace(`/classes?open=${l.id}`); }}>
                     <span className="num serif">{pad(l.number)}</span>
                     <span className="thumb">{l.slides[0] ? <SlideView s={l.slides[0]} n={l.number} /> : <span className="slide"><span className="ph">no slides</span></span>}</span>
                     <span className="grow">
@@ -313,7 +357,17 @@ export default function Classes() {
                     <span className="mono mute meta">
                       <span className={`v ${l.status === "ready" ? "ok" : "todo"}`}>{l.status === "ready" ? "ready" : "in prep"}</span>
                       <span>{l.slides.length} slides{l.research ? " · doc" : ""}{l.materials?.length ? ` · ${l.materials.length} file(s)` : ""}</span>
-                      <Link className="btn sm" href={`/prep?lesson=${l.id}&improve=1`} onClick={(e) => e.stopPropagation()}>suggest improvements</Link>
+                      <span className="row" style={{ gap: 14 }} onClick={(e) => e.stopPropagation()}>
+                        {copyFor === l.id ? (
+                          <select className="select" autoFocus style={{ width: "auto", fontSize: 16, padding: "2px 0" }} defaultValue="" onBlur={() => setCopyFor(null)} onChange={(e) => e.target.value && copyTo(l.id, e.target.value)} aria-label="Copy to course">
+                            <option value="" disabled>copy to…</option>
+                            {courses.filter((k) => k.id !== OTHER).map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                          </select>
+                        ) : (
+                          <button className="btn sm ghost" onClick={() => setCopyFor(l.id)}>copy to…</button>
+                        )}
+                        <Link className="btn sm" href={`/prep?lesson=${l.id}&improve=1`}>suggest improvements</Link>
+                      </span>
                     </span>
                   </div>
                 ))}

@@ -7,8 +7,10 @@ import { useEffect, useState } from "react";
 import { getPass, load, save, setPass, useStatus } from "@/lib/client";
 import { OTHER, useStudio } from "@/lib/studio";
 import Renamable from "./Renamable";
+import Search from "./Search";
 
 const TABS = [
+  ["/", "home"],
   ["/classes", "classes"],
   ["/prep", "prep"],
   ["/library", "library"],
@@ -43,13 +45,14 @@ export default function Nav() {
     document.documentElement.dataset.theme = next ? "dark" : "light";
   }
 
+  if (path.startsWith("/handout")) return null; // the handout is a clean printable page
   return (
     <aside className="side">
-      <Link href="/classes" className="mark">pine studio</Link>
+      <Link href="/" className="mark">pine studio</Link>
       <nav aria-label="Sections">
         {TABS.map(([href, label]) => (
           <div key={href}>
-            <Link href={href} aria-current={path.startsWith(href) ? "page" : undefined}>{label}</Link>
+            <Link href={href} aria-current={(href === "/" ? path === "/" : path.startsWith(href)) ? "page" : undefined}>{label}</Link>
             {href === "/classes" && courses.filter((c) => c.id !== OTHER).length > 0 && (
               <div className="sub" title="Drag to reorder · right-click to rename">
                 {courses.filter((c) => c.id !== OTHER).map((c) => (
@@ -88,6 +91,8 @@ export default function Nav() {
           </div>
         ))}
       </nav>
+      <button className="linkish searchlink" onClick={() => window.dispatchEvent(new Event("pine:search"))}>search <span className="mute">⌘K</span></button>
+      <Search />
       <div className="foot">
         <span title={st ? `Research & fact-check: ${st.claude ? "on" : "off"}. Saving: ${st.db ? "shared across devices" : "this browser only"}.` : ""}>
           {st ? (st.claude ? "research on" : "research off") : ""}

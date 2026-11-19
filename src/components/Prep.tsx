@@ -2,11 +2,12 @@
 // Prep: four steps. 1 Brief → 2 Research (document, questions, exhibits) → 3 Slides → 4 Check & finish.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, proxied, uid, useCollection, useStatus } from "@/lib/client";
 import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
-import { forget, recover, useJob } from "@/lib/jobs";
+import { recover, runJob, useJob } from "@/lib/jobs";
+import { makeClass, runCheck, runResearch, runSlides, slideCount } from "@/lib/make";
 import { restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
 import { caption } from "@/lib/museum";
 import { downloadPptx } from "@/lib/pptx";
@@ -43,7 +44,9 @@ function Src({ sources }: { sources: { title: string; url: string }[] }) {
 
 /* ───────── Step 1: brief ───────── */
 
-function Brief({ lesson, preset, onSave, onNext }: { lesson: Lesson | null; preset?: string | null; onSave: (b: { courseId: string; newCourse?: string; number: number; topic: string; premise: string }) => void; onNext?: () => void }) {
+type BriefData = { courseId: string; newCourse?: string; number: number; topic: string; premise: string; minutes?: number };
+
+function Brief({ lesson, preset, onSave, onMake }: { lesson: Lesson | null; preset?: string | null; onSave: (b: BriefData) => void; onMake: (b: BriefData) => void }) {
   const { courses, lessons } = useStudio();
   const real = courses.filter((c) => c.id !== OTHER);
   const [courseId, setCourseId] = useState(lesson?.courseId && lesson.courseId !== OTHER ? lesson.courseId : real.find((c) => c.id === preset)?.id ?? real[0]?.id ?? "new");
@@ -52,7 +55,10 @@ function Brief({ lesson, preset, onSave, onNext }: { lesson: Lesson | null; pres
   const [number, setNumber] = useState(lesson?.number ?? nextNum(courseId));
   const [topic, setTopic] = useState(lesson?.topic ?? "");
   const [premise, setPremise] = useState(lesson?.premise ?? "");
+  const [minutes, setMinutes] = useState<number | undefined>(lesson?.minutes);
+  const st = useStatus();
   const ok = topic.trim() && (courseId !== "new" || newCourse.trim());
+  const data = (): BriefData => ({ courseId, newCourse: courseId === "new" ? newCourse.trim() : undefined, number, topic: topic.trim(), premise: premise.trim(), minutes });
 
   return (
     <form
@@ -61,8 +67,7 @@ function Brief({ lesson, preset, onSave, onNext }: { lesson: Lesson | null; pres
       onSubmit={(e) => {
         e.preventDefault();
         if (!ok) return;
-        onSave({ courseId, newCourse: courseId === "new" ? newCourse.trim() : undefined, number, topic: topic.trim(), premise: premise.trim() });
-        onNext?.();
+        onSave(data());
       }}
     >
       <div className="row" style={{ alignItems: "end" }}>
@@ -77,6 +82,13 @@ function Brief({ lesson, preset, onSave, onNext }: { lesson: Lesson | null; pres
           <label className="label mono">Class #</label>
           <input className="input" type="number" min={1} value={number} onChange={(e) => setNumber(Number(e.target.value) || 1)} />
         </div>
+        <div style={{ width: 150 }}>
+          <label className="label mono">Class length</label>
+          <select className="select" value={minutes ?? ""} onChange={(e) => setMinutes(Number(e.target.value) || undefined)}>
+            <option value="">—</option>
+            {[50, 75, 100, 150].map((m) => <option key={m} value={m}>{m} minutes</option>)}
+          </select>
+        </div>
       </div>
       {courseId === "new" && (
         <div><label className="label mono">New course name</label><input className="input" autoFocus value={newCourse} onChange={(e) => setNewCourse(e.target.value)} placeholder="e.g. Art Appreciation 103" /></div>
@@ -87,8 +99,14 @@ function Brief({ lesson, preset, onSave, onNext }: { lesson: Lesson | null; pres
         <textarea className="area" value={premise} onChange={(e) => setPremise(e.target.value)} placeholder="e.g. How photography changed what painters thought painting was for. Link to works students can see at the Art Institute." />
       </div>
       <div className="row">
-        <button className="btn solid" disabled={!ok}>{lesson ? "Save and go to research →" : "Start this class →"}</button>
+        <button type="button" className="btn solid" disabled={!ok || st?.claude === false} onClick={() => ok && onMake(data())} title="Research, slides with exhibits, and fact-check — in one go">
+          make my class
+        </button>
+        <button className="btn">{lesson ? "save — I'll go step by step" : "step by step"}</button>
       </div>
+      <p className="mute" style={{ margin: 0, fontSize: 16 }}>
+        <b>make my class</b> does it all in one go (about 5–8 minutes): research, slides with the best exhibits, then a fact-check. You can work elsewhere meanwhile and change anything afterwards.
+      </p>
     </form>
   );
 }
@@ -109,10 +127,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
     if (doc && !confirm("Replace the current research document with a new one?")) return;
     job.clearError();
     await job.run(async () => {
-      const key = `research:${lesson.id}`;
-      const r = await api<ResearchDoc>("/api/research", { method: "POST", body: JSON.stringify({ topic: lesson.topic, premise: lesson.premise, course, jobKey: key }) });
-      set((l) => withResearch(l, r));
-      forget(key);
+      await runResearch(lesson, course, set);
     });
   }
 
@@ -242,13 +257,18 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
 
 /* ───────── Step 3: slides ───────── */
 
-function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; resources: Resource[]; onNext: () => void }) {
+function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; resources: Resource[]; initial?: string | null }) {
   const st = useStatus();
-  const [sel, setSel] = useState<string | null>(null);
+  const [sel, setSel] = useState<string | null>(initial ?? null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    if (initial) setSel(initial);
+  }, [initial]);
+  const checkJob = useJob(`check:${lesson.id}`);
   const [tool, setTool] = useState<"exhibits" | "textbook" | "images" | "library">("exhibits");
   const [q, setQ] = useState("");
   const [over, setOver] = useState<string | null>(null);
-  const [count, setCount] = useState(12);
+  const [count, setCount] = useState(slideCount(lesson.minutes));
   const job = useJob(`slides:${lesson.id}`);
   const busy = job.running;
   const err = job.error;
@@ -266,11 +286,8 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
     if (lesson.slides.length && !confirm("Replace the current slides with new ones made from the research?")) return;
     job.clearError();
     await job.run(async () => {
-      const key = `slides:${lesson.id}`;
-      const r = await api<{ slides: Slide[] }>("/api/slides", { method: "POST", body: JSON.stringify({ course, number: lesson.number, topic: lesson.topic, premise: lesson.premise, doc: lesson.research, count, jobKey: key }) });
-      set((l) => withSlides(l, r.slides));
-      forget(key);
-      setSel(r.slides[0]?.id ?? null);
+      const slides = await runSlides(lesson, course, set, count);
+      setSel(slides[0]?.id ?? null);
     });
   }
 
@@ -295,6 +312,32 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
     setSlides((ss) => { const n = [...ss]; n.splice(at ?? n.length, 0, s); return n; });
     setSel(s.id);
   }
+  // ← / → move between slides (when not typing).
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return;
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const i = lesson.slides.findIndex((x) => x.id === (slide?.id ?? ""));
+      const j = Math.max(0, Math.min(lesson.slides.length - 1, i + (e.key === "ArrowRight" ? 1 : -1)));
+      if (lesson.slides[j]) setSel(lesson.slides[j].id);
+    };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [lesson.slides, slide?.id]);
+
+  // Quiet fact-check: about 20 seconds after she stops editing, check the slides that changed.
+  const pendingCheck = lesson.slides.filter((x) => !x.check && [x.title, x.body, x.notes].some((t) => t.trim())).map((x) => x.id + x.title + x.body).join("|");
+  useEffect(() => {
+    if (!pendingCheck || st?.claude !== true || checkJob.running || busy) return;
+    const t = setTimeout(() => {
+      checkJob.clearError();
+      checkJob.run(() => runCheck(lesson, set));
+    }, 20_000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCheck, st?.claude, checkJob.running, busy]);
+
   const addArt = (a: Artwork) => { if (slide) setSlide(slide.id, (s) => addTo(s, { kind: "artwork", artwork: a })); else { const s = slideFrom({ kind: "artwork", artwork: a }); setSlides((x) => [...x, s]); setSel(s.id); } };
 
   const maker = (
@@ -331,20 +374,30 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
         {maker}
         <span className="mono mute">{lesson.slides.length} slides</span>
       </div>
+      {checkJob.error && <div className="err" style={{ marginBottom: 12 }}>Fact-check: {checkJob.error}</div>}
       {busy && <Working since={job.started} what="Remaking slides" doing="Turning the research document into slides with talking points, speaker notes and your exhibits" usual="1–2 minutes" />}
       {err && <div className="err" style={{ marginBottom: 12 }}>{err}</div>}
       <div className="bench slides">
         {slide && (
           <section className={`stage ${over === "stage" ? "over" : ""}`} onDragOver={(e) => { if (e.dataTransfer.types.includes(MIME)) { e.preventDefault(); setOver("stage"); } }} onDragLeave={() => setOver(null)}
             onDrop={(e) => { e.preventDefault(); setOver(null); const it = readDrag(e); if (it) setSlide(slide.id, (s) => addTo(s, it)); }}>
-            <div className="row" style={{ marginBottom: 10, flexWrap: "nowrap" }}>
-              <span className="mono mute">{pad(lesson.slides.indexOf(slide) + 1)}</span>
-              <input className="input plain h grow" value={slide.title} onChange={(e) => edit({ title: e.target.value })} aria-label="Slide title" />
-              <select className="select" style={{ width: "auto" }} value={slide.layout} onChange={(e) => edit({ layout: e.target.value as Slide["layout"] })} aria-label="Layout">
-                <option value="title">Title</option><option value="text">Text</option><option value="artwork">Artwork</option><option value="compare">Compare two</option>
-              </select>
+            <div className="row" style={{ marginBottom: 10, justifyContent: "space-between" }}>
+              <span className="mono mute">slide {pad(lesson.slides.indexOf(slide) + 1)} of {lesson.slides.length} · click the title to edit · ← → to move</span>
+              <span className="row" style={{ gap: 12 }}>
+                <span className={`v ${stateMark[slideState(slide)]}`}>{checkJob.running && !slide.check ? "checking…" : stateText[slideState(slide)]}</span>
+                <select className="select" style={{ width: "auto" }} value={slide.layout} onChange={(e) => edit({ layout: e.target.value as Slide["layout"] })} aria-label="Layout">
+                  <option value="title">title</option><option value="text">text</option><option value="artwork">one work</option><option value="compare">compare two</option>
+                </select>
+              </span>
             </div>
-            <SlideView s={slide} n={lesson.number} />
+            <SlideView
+              s={slide}
+              n={lesson.number}
+              edit={{
+                onTitle: (t) => edit({ title: t }),
+                onRemoveImage: (i) => setSlide(slide.id, (x) => ({ ...x, images: x.images.filter((_, j) => j !== i), artworks: x.artworks.filter((a) => caption(a) !== x.images[i]?.credit), check: undefined })),
+              }}
+            />
             <div className="stack" style={{ marginTop: 14 }}>
               <div>
                 <label className="label mono">talking points — a few bullets, one per line{slide.artworks.length ? ", linking the research to this work" : ""}</label>
@@ -354,17 +407,7 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
               {slide.notes && (
                 <div><label className="label mono">notes from your deck</label><textarea className="area" rows={3} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })} /></div>
               )}
-              {slide.images.length > 0 && (
-                <div className="thumbs">
-                  {slide.images.map((im, i) => (
-                    <div key={i} className="t" title={im.credit}>
-                      <div className="photo"><img src={proxied(im.url)} alt="" /></div>
-                      <div className="mono" style={{ fontSize: 12, marginTop: 3 }}>{im.rights === "public-domain" ? "public domain" : im.rights === "own" ? "yours" : "rights: check"}</div>
-                      <button className="btn sm solid" onClick={() => setSlide(slide.id, (s) => ({ ...s, images: s.images.filter((_, j) => j !== i), artworks: s.artworks.filter((a) => caption(a) !== im.credit) }))} aria-label="Remove image">×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {slide.check && slide.check.claims.some((c) => c.verdict !== "supported") && <Claims claims={slide.check.claims.filter((c) => c.verdict !== "supported")} />}
               <Src sources={slide.sources} />
               <div className="row">
                 <button className="btn sm ghost" onClick={() => { const c = { ...slide, id: uid(), check: undefined }; setSlides((x) => { const i = x.findIndex((y) => y.id === slide.id); const n = [...x]; n.splice(i + 1, 0, c); return n; }); setSel(c.id); }}>Duplicate</button>
@@ -375,9 +418,10 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
         )}
         <aside className="drawer">
           <div className="dtabs" role="tablist">
-            {(["exhibits", "textbook", "images", "library"] as const).map((t) => (
-              <button key={t} role="tab" className="dtab mono" aria-selected={tool === t} onClick={() => setTool(t)}>{t === "images" ? "My images" : t}</button>
+            {(more ? (["exhibits", "textbook", "images", "library"] as const) : (["exhibits"] as const)).map((t) => (
+              <button key={t} role="tab" className="dtab mono" aria-selected={tool === t} onClick={() => setTool(t)}>{t === "images" ? "my images" : t}</button>
             ))}
+            {!more && <button className="dtab mono" onClick={() => setMore(true)} title="textbook pages, your own images, library">+ more</button>}
           </div>
           <div className="dbody">
             <div className={tool === "exhibits" ? "stack" : "hide"}>
@@ -415,14 +459,14 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
               onDragStart={(e) => { e.dataTransfer.setData(FRAME, s.id); e.dataTransfer.effectAllowed = "move"; }}
               onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.stopPropagation(); dropOnStrip(e, i); }}>
               <SlideView s={s} n={lesson.number} />
-              <span className="n"><span>{pad(i + 1)}</span><span className={`v ${stateMark[state]}`}>{stateText[state]}</span></span>
+              <span className="n"><span>{pad(i + 1)}</span><span className={`v ${stateMark[state]}`}>{checkJob.running && !s.check ? "checking…" : stateText[state]}</span></span>
             </button>
           );
         })}
         <button className="add" onClick={() => { const s = blankSlide("text"); setSlides((x) => [...x, s]); setSel(s.id); }}>+ Slide<br />or drop here</button>
       </div>
       <div className="nextbar">
-        <span className="mute">Drag frames to reorder. Everything saves automatically.</span>
+        <span className="mute">Drag frames to reorder. Slides are fact-checked automatically a few seconds after you stop editing. Everything saves automatically.</span>
       </div>
     </>
   );
@@ -441,18 +485,8 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
 
   async function check(all: boolean) {
     setErr("");
-    const targets = lesson.slides.filter((s) => all || !s.check);
-    const items = checkItems(targets);
-    const ids = new Set(targets.map((t) => t.id));
-    const at = new Date().toISOString();
-    if (!items.length) return set((l) => ({ ...l, slides: l.slides.map((s) => (ids.has(s.id) ? { ...s, check: { at, claims: [] } } : s)) }));
     job.clearError();
-    await job.run(async () => {
-      const key = `check:${lesson.id}`;
-      const res = await api<{ claims: Claim[]; at: string }>("/api/check", { method: "POST", body: JSON.stringify({ items, jobKey: key }) });
-      set((l) => withCheck(l, res, [...ids]));
-      forget(key);
-    });
+    await job.run(() => runCheck(lesson, set, all));
   }
 
   return (
@@ -465,7 +499,7 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
           {r.rights > 0 && <span className="mute">{r.rights} image(s): rights to check</span>}
         </div>
         <div className="row">
-          <button className="btn" disabled={busy || st?.claude === false || !lesson.slides.length} onClick={() => check(false)}>{busy ? "checking…" : r.unchecked ? `fact-check ${r.unchecked} slide(s)` : "re-check all"}</button>
+          <button className="btn" disabled={busy || st?.claude === false || !lesson.slides.length} onClick={() => check(!r.unchecked)}>{busy ? "checking…" : r.unchecked ? `fact-check ${r.unchecked} slide(s) now` : "re-check all"}</button>
         </div>
       </div>
       {busy && <Working since={job.started} what="Fact-checking" doing="Searching the web to check every name, date and claim on your slides" usual="1–3 minutes" />}
@@ -491,6 +525,7 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
         <div className="row">
           <button className="btn ghost" disabled={pptx || !lesson.slides.length} onClick={async () => { setPptx(true); try { await downloadPptx(lesson); } finally { setPptx(false); } }}>{pptx ? "Building…" : "PowerPoint ↓"}</button>
           {lesson.research && <button className="btn ghost" onClick={() => downloadDocx(lesson, course)}>Research document ↓</button>}
+          <a className="btn ghost" href={`/handout/${lesson.id}`} target="_blank" rel="noreferrer">Student handout ↓</a>
         </div>
         <div className="row">
           {!r.ok && <span className="mute" style={{ fontSize: 16 }}>{r.problems ? "Fix the ✗ facts first." : r.unchecked ? "Run the fact-check first." : "Add slides first."}</span>}
@@ -519,19 +554,62 @@ export default function Prep() {
   const [step, setStep] = useState<Step>(1);
   const [creating, setCreating] = useState(false);
   const [talk, setTalk] = useState(false);
+  const makeJob = useJob(`make:${lessonId ?? "new"}`);
+  const history = useRef<Lesson[]>([]);
+  const lastPush = useRef(0);
+  const current = useRef<Lesson | null>(null);
+  const [, bump] = useState(0);
 
   useEffect(() => {
     if (!ready) return;
     const want = params.get("lesson");
     if (params.get("new")) { setCreating(true); setStep(1); return; }
     const l = lessons.find((x) => x.id === want) ?? (!lessonId ? lessons.find((x) => x.status === "draft") : undefined);
-    if (l) { setLessonId(l.id); setStep(params.get("improve") ? 2 : l.slides.length ? 3 : l.research ? 2 : l.premise ? 2 : 1); }
+    const asked = Number(params.get("step"));
+    if (l) { setLessonId(l.id); setStep(asked >= 1 && asked <= 4 ? (asked as Step) : params.get("slide") ? 3 : params.get("improve") ? 2 : l.slides.length ? 3 : l.research ? 2 : l.premise ? 2 : 1); }
     else if (!lessonId) setCreating(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, params]);
 
   const lesson = creating ? null : lessons.find((l) => l.id === lessonId) ?? null;
-  const set = (fn: (l: Lesson) => Lesson) => lesson && updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? fn(l) : l)));
+  current.current = lesson;
+  // Every change keeps the previous state for ⌘Z / undo (typing bursts count as one change).
+  const set = useCallback(
+    (fn: (l: Lesson) => Lesson) => {
+      const id = current.current?.id ?? lessonId;
+      if (!id) return;
+      const now = Date.now();
+      if (current.current && now - lastPush.current > 1500) {
+        history.current = [...history.current.slice(-29), current.current];
+        bump((n) => n + 1);
+      }
+      lastPush.current = now;
+      updateLessons((cur) => cur.map((l) => (l.id === id ? fn(l) : l)));
+    },
+    [lessonId, updateLessons],
+  );
+  const undo = useCallback(() => {
+    const prev = history.current.pop();
+    if (!prev) return;
+    lastPush.current = 0;
+    bump((n) => n + 1);
+    updateLessons((cur) => cur.map((l) => (l.id === prev.id ? prev : l)));
+  }, [updateLessons]);
+  useEffect(() => {
+    history.current = [];
+    bump((n) => n + 1);
+  }, [lessonId]);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z" || e.shiftKey) return;
+      const t = e.target as HTMLElement;
+      if (t.isContentEditable || /INPUT|TEXTAREA/.test(t.tagName)) return; // let the text box undo its own typing
+      e.preventDefault();
+      undo();
+    };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [undo]);
   const course = lesson ? courseName(lesson.courseId) : "";
 
   // Pick up results that finished while this page was closed or reloaded.
@@ -547,22 +625,36 @@ export default function Prep() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, lessonId]);
 
-  function saveBrief(b: { courseId: string; newCourse?: string; number: number; topic: string; premise: string }) {
+  function saveBrief(b: BriefData, then: Step = 2): Lesson {
     let courseId = b.courseId;
     if (b.newCourse) {
       courseId = uid();
       updateCourses((cur) => [...cur, { id: courseId, name: b.newCourse! }]);
     }
-    if (lesson) set((l) => ({ ...l, courseId, number: b.number, topic: b.topic, premise: b.premise }));
-    else {
-      const l: Lesson = { id: uid(), courseId, number: b.number, topic: b.topic, premise: b.premise, readings: [], slides: [], status: "draft" };
-      updateLessons((cur) => [...cur, l]);
-      setLessonId(l.id);
+    let saved: Lesson;
+    if (lesson) {
+      saved = { ...lesson, courseId, number: b.number, topic: b.topic, premise: b.premise, minutes: b.minutes };
+      set(() => saved);
+    } else {
+      saved = { id: uid(), courseId, number: b.number, topic: b.topic, premise: b.premise, minutes: b.minutes, readings: [], slides: [], status: "draft" };
+      updateLessons((cur) => [...cur, saved]);
+      setLessonId(saved.id);
       setCreating(false);
-      router.replace(`/prep?lesson=${l.id}`);
+      router.replace(`/prep?lesson=${saved.id}`);
     }
-    setStep(2);
+    setStep(then);
+    return saved;
   }
+
+  // One click: research → slides → fact-check, in the background.
+  function make(l: Lesson) {
+    const upd = (fn: (x: Lesson) => Lesson) => updateLessons((cur) => cur.map((x) => (x.id === l.id ? fn(x) : x)));
+    runJob(`make:${l.id}`, (stage) => makeClass(l, courseName(l.courseId) || "", upd, stage));
+  }
+  useEffect(() => {
+    if (ready && lesson && params.get("make") === "1" && !lesson.research && !makeJob.running) make(lesson);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, lesson?.id]);
 
   if (!ready) return <main className="page"><p className="mute">Loading…</p></main>;
 
@@ -589,6 +681,7 @@ export default function Prep() {
               ))}
             </select>
           )}
+          {history.current.length > 0 && <button className="btn ghost" onClick={undo} title="Undo the last change (⌘Z)">undo</button>}
           <button className="btn ghost" onClick={() => { setCreating(true); setStep(1); router.replace("/prep?new=1"); }}>+ New class</button>
         </div>
       </div>
@@ -601,12 +694,16 @@ export default function Prep() {
         ))}
       </nav>
 
-      {step === 1 && <Brief key={lesson?.id ?? `new-${params.get("course") ?? ""}`} lesson={lesson} preset={params.get("course")} onSave={saveBrief} />}
+      {lesson && makeJob.running && (
+        <Working since={makeJob.started} what={makeJob.stage ? `Making your class — ${makeJob.stage}` : "Making your class"} doing="Researching, building slides with exhibits, then fact-checking. You can look around or work in another tab" usual="5–8 minutes" />
+      )}
+      {lesson && makeJob.error && <div className="err" style={{ marginBottom: 14 }}>{makeJob.error}</div>}
+      {step === 1 && <Brief key={lesson?.id ?? `new-${params.get("course") ?? ""}`} lesson={lesson} preset={params.get("course")} onSave={(b) => saveBrief(b)} onMake={(b) => { const l = saveBrief(b, 2); make(l); }} />}
       {lesson && step === 2 && (lesson.slides.length > 0 || (lesson.materials?.length ?? 0) > 0 || lesson.review) && (
         <Improve key={lesson.id} lesson={lesson} course={course} set={set} autoRun={params.get("improve") === "1"} />
       )}
       {lesson && step === 2 && <ResearchStep lesson={lesson} course={course} set={set} onNext={() => setStep(3)} />}
-      {lesson && step === 3 && <SlidesStep lesson={lesson} course={course} set={set} resources={resources} onNext={() => setStep(4)} />}
+      {lesson && step === 3 && <SlidesStep key={lesson.id} lesson={lesson} course={course} set={set} resources={resources} initial={params.get("slide")} />}
       {lesson && step === 4 && <FinishStep lesson={lesson} course={course} set={set} />}
 
       {lesson && (

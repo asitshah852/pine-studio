@@ -9,6 +9,13 @@ export default function Working({ what, doing, usual, since }: { what: string; d
     const i = setInterval(() => setT(Math.floor((Date.now() - start) / 1000)), 1000);
     return () => clearInterval(i);
   }, []);
+  useEffect(() => {
+    const before = document.title.replace(/^● .*? · /, "");
+    document.title = `● ${what.toLowerCase()}… · ${before}`;
+    return () => {
+      document.title = before;
+    };
+  }, [what]);
   const clock = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
   return (
     <div className="working" role="status" aria-live="polite">

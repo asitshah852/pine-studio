@@ -134,6 +134,7 @@ export type Lesson = {
   number: number; // class number within the course
   topic: string;
   premise: string; // her angle / what the class is about
+  minutes?: number; // class length (50 / 75 / 150)
   research?: ResearchDoc;
   materials?: Material[]; // files she uploaded (her existing class materials)
   review?: ReviewDoc; // "suggest improvements"
