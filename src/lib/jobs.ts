@@ -42,3 +42,45 @@ export function useJob(key: string) {
     },
   };
 }
+
+// ── Picking up results a closed or reloaded page missed ───────────────────────
+type Rec = { status: "running" | "done" | "failed"; started: string; data?: unknown; error?: string; meta?: unknown };
+
+export function forget(key: string) {
+  import("./client").then(({ api }) => api(`/api/result?key=${encodeURIComponent(key)}`, { method: "DELETE" }).catch(() => {}));
+}
+
+/** If the server holds a finished result for this job, apply it; if it is still running, wait for it. */
+export async function recover(key: string, apply: (data: unknown, meta: unknown) => void) {
+  if (jobs.has(key)) return;
+  const { api, getStatus } = await import("./client");
+  if (!(await getStatus()).db) return;
+  const get = async () => (await api<{ result: Rec | null }>(`/api/result?key=${encodeURIComponent(key)}`)).result;
+  let r: Rec | null;
+  try {
+    r = await get();
+  } catch {
+    return;
+  }
+  if (!r) return;
+  const started = Date.parse(r.started) || Date.now();
+  if (r.status === "running") {
+    if (Date.now() - started > 6 * 60_000) return forget(key); // gave up long ago
+    jobs.set(key, { started });
+    emit();
+    while (r && r.status === "running" && Date.now() - started < 6 * 60_000) {
+      await new Promise((ok) => setTimeout(ok, 8000));
+      try {
+        r = await get();
+      } catch {
+        /* try again */
+      }
+    }
+  }
+  if (r?.status === "done") {
+    apply(r.data, r.meta);
+    jobs.delete(key);
+  } else jobs.set(key, { started: 0, error: r?.error || "That job didn't finish. Please try again." });
+  emit();
+  forget(key);
+}

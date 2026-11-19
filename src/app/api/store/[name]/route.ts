@@ -20,6 +20,13 @@ export async function PUT(req: Request, { params }: Ctx) {
   if (!dbConfigured()) return Response.json({ shared: false });
   const text = await req.text();
   if (text.length > 4_000_000) return Response.json({ error: "Too big to save in one go." }, { status: 413 });
+  // Daily backup: the first save each day keeps a copy of what was there before (30 days).
+  const day = new Date().toISOString().slice(0, 10);
+  const backup = K(`backup:${name}:${day}`);
+  if (!(await db().exists(backup))) {
+    const old = await db().get(K(name));
+    if (old) await db().set(backup, old, { ex: 30 * 86400, nx: true });
+  }
   await db().set(K(name), JSON.parse(text));
   return Response.json({ shared: true });
 }

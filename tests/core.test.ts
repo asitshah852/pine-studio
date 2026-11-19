@@ -83,3 +83,32 @@ test("applying a suggestion rewrites the slide or adds one after it, and clears 
   const added = applySuggestion([a, b], { ...base, slideId: a.id, newSlide: { title: "Extra", body: "p", notes: "n" } });
   assert.deepEqual(added.map((s) => s.title), ["Old", "Extra", "Next"]);
 });
+
+test("saving merges with the online copy instead of overwriting it", async () => {
+  const { mergeLists, diffIds } = await import("../src/lib/merge");
+  type I = { id: string; v: number };
+  const online: I[] = [{ id: "a", v: 2 }, { id: "b", v: 2 }, { id: "c", v: 1 }]; // b updated on the phone, c added there
+  const laptop: I[] = [{ id: "a", v: 1 }, { id: "b", v: 1 }, { id: "d", v: 1 }]; // old tab: edits a? no — adds d, deletes nothing
+  const before: I[] = [{ id: "a", v: 1 }, { id: "b", v: 1 }];
+  const d = diffIds(before, laptop);
+  assert.deepEqual(d, { changed: ["d"], deleted: [] });
+  const merged = mergeLists(online, laptop, new Set(d.changed), new Set(d.deleted));
+  assert.deepEqual(merged, [{ id: "a", v: 2 }, { id: "b", v: 2 }, { id: "d", v: 1 }, { id: "c", v: 1 }]);
+  // a deletion here and an edit here both win
+  assert.deepEqual(mergeLists(online, [{ id: "a", v: 9 }], new Set(["a"]), new Set(["b"])), [{ id: "a", v: 9 }, { id: "c", v: 1 }]);
+});
+
+test("replacing research or slides keeps the old one to restore", async () => {
+  const { withResearch, withSlides, restore } = await import("../src/lib/lessonOps");
+  const doc = (at: string) => ({ at, overview: at, sections: [], questions: [], exhibits: [] });
+  let l: import("../src/lib/types").Lesson = { id: "l", courseId: "c", number: 1, topic: "t", premise: "", readings: [], slides: [blankSlide("text", "A")], status: "draft", research: doc("first") };
+  l = withResearch(l, doc("second"));
+  l = withSlides(l, [blankSlide("text", "B")]);
+  assert.equal(l.research?.overview, "second");
+  assert.equal(l.versions?.filter((v) => v.kind === "research").length, 1);
+  l = restore(l, l.versions!.find((v) => v.kind === "research")!);
+  assert.equal(l.research?.overview, "first");
+  assert.equal(l.versions?.find((v) => v.kind === "research")?.research?.overview, "second");
+  l = restore(l, l.versions!.find((v) => v.kind === "slides")!);
+  assert.equal(l.slides[0].title, "A");
+});

@@ -121,7 +121,10 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
                 <div>
                   <div className="mono mute">{pad(i + 1)}</div>
                   <h3 style={{ fontSize: 17, fontWeight: 500 }}>{s.title || "Untitled"}</h3>
-                  {s.notes ? <p style={{ margin: "6px 0 0", fontSize: 17, whiteSpace: "pre-wrap" }}>{s.notes}</p> : <p className="mute" style={{ margin: "6px 0 0" }}>No speaker notes.</p>}
+                  {s.body.trim() ? (
+                    <ul className="talk">{s.body.split("\n").map((t) => t.trim()).filter(Boolean).map((t, j) => <li key={j}>{t}</li>)}</ul>
+                  ) : <p className="mute" style={{ margin: "6px 0 0" }}>No talking points.</p>}
+                  {s.notes && <p className="mute" style={{ margin: "6px 0 0", whiteSpace: "pre-wrap" }}>{s.notes}</p>}
                 </div>
               </div>
             ))}

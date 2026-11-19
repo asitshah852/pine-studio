@@ -36,7 +36,7 @@ export default function SlideView({ s, n }: { s: Slide; n?: number }) {
         </div>
       )}
       <div className="st">{s.title}</div>
-      {layout !== "compare" && list}
+      {(layout === "text" || layout === "title") && list}
     </div>
   );
 }

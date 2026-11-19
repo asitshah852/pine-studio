@@ -110,12 +110,14 @@ DISCUSSION QUESTIONS: ${input.doc.questions.join(" | ")}
 
 Structure: a title slide; content slides that follow the document's order; exhibit slides where the works fit; a closing "Discuss" slide with 2–3 of the questions.
 
-Return ONLY JSON: { "slides": [ { "layout": "title | text | artwork | compare", "title": "short slide title", "points": ["brief talking point shown on the slide, max 12 words"], "notes": "speaker notes in simple, spoken language, 50–110 words", "paragraphs": ["paragraph ids the facts came from"], "exhibits": ["exhibit ids shown on this slide"] } ] }
-Rules: 0–4 points per slide (none on title slides); artwork slides use exactly 1 exhibit, compare slides exactly 2.`,
+Each slide gets ONE set of talking points for her: 3–5 short bullets in plain, spoken language. On exhibit slides, the bullets connect the research to the work on screen — what to point out in it and why it matters for the topic (e.g. "Point to the flat, cut-out figures — that's the poster look MTV borrowed"). On text slides, they are the key ideas.
+
+Return ONLY JSON: { "slides": [ { "layout": "title | text | artwork | compare", "title": "short slide title", "talking": ["talking point, max 20 words"], "paragraphs": ["paragraph ids the facts came from"], "exhibits": ["exhibit ids shown on this slide"] } ] }
+Rules: no talking points on the title slide; artwork slides use exactly 1 exhibit, compare slides exactly 2.`,
       },
     ],
   });
-  type RawSlide = { layout?: string; title?: string; points?: string[]; notes?: string; paragraphs?: string[]; exhibits?: string[] };
+  type RawSlide = { layout?: string; title?: string; talking?: string[]; points?: string[]; paragraphs?: string[]; exhibits?: string[] };
   const raw = parseJson<{ slides?: RawSlide[] }>(text);
   const byPara = new Map(paras.map((p) => [p.id, p]));
   const byWork = new Map(works.map((w) => [w.id, w.match!]));
@@ -134,8 +136,8 @@ Rules: 0–4 points per slide (none on title slides); artwork slides use exactly
       id: rid(),
       layout,
       title: String(r.title ?? ""),
-      body: (r.points ?? []).filter((x) => typeof x === "string").join("\n"),
-      notes: String(r.notes ?? ""),
+      body: (r.talking ?? r.points ?? []).filter((x) => typeof x === "string").join("\n"),
+      notes: "",
       images: arts
         .map((a) =>
           a.imageUrl
@@ -265,8 +267,8 @@ Review it and return ONLY JSON (in a \`\`\`json block):
      "kind": "accuracy | content | discussion | exhibit | structure | clarity",
      "slide": "slide id it concerns, or empty",
      "text": "what to change and why, in plain language (1–3 sentences)",
-     "change": { "title": "new title or empty", "body": "new on-slide points, one per line, or empty", "notes": "new speaker notes or empty" },   // only when proposing new wording for that slide
-     "newSlide": { "title": "...", "body": "...", "notes": "..." },   // only when proposing an extra slide after that slide
+     "change": { "title": "new title or empty", "body": "new talking points (3–5 short bullets, one per line; on exhibit slides they link the research to the work) or empty" },   // only when proposing new wording for that slide
+     "newSlide": { "title": "...", "body": "talking points, one per line" },   // only when proposing an extra slide after that slide
      "sources": [ { "title": "...", "url": "exact URL you retrieved" } ]   // required for accuracy fixes and any new facts
   } ],   // 6–12 suggestions, most useful first; check her facts and flag anything wrong or outdated as "accuracy"
   "questions": [ "new discussion point or question for students" ],   // 4–6

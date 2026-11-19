@@ -84,10 +84,10 @@ export async function downloadPptx(lesson: Lesson) {
       sl.addText(s.title, { x, y: 0.6, w, h: 1.2, fontFace: FONT, fontSize: 26, color: INK, bold: true, valign: "top" });
       const cap = s.artworks[0] ? caption(s.artworks[0]) : im.meta.credit;
       sl.addText(cap, { x, y: 1.9, w, h: 1.3, fontFace: FONT, fontSize: 11, color: MUTE, valign: "top" });
-      if (bullets.length)
-        sl.addText(bullets.map((t) => ({ text: t, options: { bullet: true } })), { x, y: 3.3, w, h: H - 3.9, fontFace: FONT, fontSize: 16, color: INK, valign: "top", paraSpaceAfter: 6 });
     }
-    if (s.notes) sl.addNotes(s.notes);
+    // Talking points travel with every slide as presenter notes.
+    const talk = [bullets.map((b) => `• ${b}`).join("\n"), s.notes].filter(Boolean).join("\n\n");
+    if (talk) sl.addNotes(talk);
   }
 
   // Closing slide: every source and image credit, so the deck carries its own fact trail.

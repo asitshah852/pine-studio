@@ -1,7 +1,8 @@
 "use client";
 // Browser helpers: passcode, status, and collections that save to the shared studio database
 // when it's set up, and always keep a copy in this browser.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { diffIds, mergeLists } from "./merge";
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -55,64 +56,161 @@ export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
   return j as T;
 }
 
+// ── Saving ───────────────────────────────────────────────────────────────
+// Each list is kept in this browser at once and saved online ~0.8 s later. Before saving, the
+// online copy is fetched and merged (see merge.ts), so two devices never wipe each other's work.
+type Pending = { changed: Set<string>; deleted: Set<string> };
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
+const pending = new Map<string, Pending>();
+const latest = new Map<string, { id: string }[]>();
+const lastPull = new Map<string, number>();
+const pend = (name: string) => {
+  if (!pending.has(name)) pending.set(name, { changed: new Set(), deleted: new Set() });
+  return pending.get(name)!;
+};
+// Unsaved edits are also remembered in the browser, so closing the page mid-save loses nothing.
+const PK = (name: string) => `pine.unsaved.${name}`;
+const rememberPending = (name: string) => {
+  const p = pending.get(name);
+  save(PK(name), p && (p.changed.size || p.deleted.size) ? { changed: [...p.changed], deleted: [...p.deleted] } : null);
+};
+const broadcast = (name: string, value: unknown) =>
+  queueMicrotask(() => window.dispatchEvent(new CustomEvent("pine:sync", { detail: { name, value } })));
+
+async function flush(name: string) {
+  const p = pending.get(name);
+  const local = latest.get(name);
+  if (!p || !local || (!p.changed.size && !p.deleted.size)) return;
+  if (!(await getStatus()).db) return;
+  pending.set(name, { changed: new Set(), deleted: new Set() }); // later edits collect afresh
+  try {
+    const r = await api<{ value: { id: string }[] | null }>(`/api/store/${name}`);
+    const merged = mergeLists(Array.isArray(r.value) ? r.value : [], latest.get(name) ?? local, p.changed, p.deleted);
+    await api(`/api/store/${name}`, { method: "PUT", body: JSON.stringify(merged) });
+    rememberPending(name);
+    const now = latest.get(name) ?? local;
+    // Only adopt the merged list if nothing new was typed meanwhile (that will be merged next save).
+    const q = pending.get(name)!;
+    if (!q.changed.size && !q.deleted.size && JSON.stringify(merged) !== JSON.stringify(now)) {
+      latest.set(name, merged);
+      save(`pine.${name}`, merged);
+      broadcast(name, merged);
+    }
+  } catch {
+    // Couldn't reach the database: keep the changes queued and try again shortly.
+    const q = pend(name);
+    p.changed.forEach((id) => q.changed.add(id));
+    p.deleted.forEach((id) => q.deleted.add(id));
+    rememberPending(name);
+    clearTimeout(timers.get(name));
+    timers.set(name, setTimeout(() => flush(name), 15_000));
+  }
+}
+
+/** Fetch the online copy (e.g. when she comes back to the tab) unless there are unsaved edits. */
+async function pull(name: string) {
+  if (Date.now() - (lastPull.get(name) ?? 0) < 5000) return;
+  lastPull.set(name, Date.now());
+  const p = pending.get(name);
+  if (p && (p.changed.size || p.deleted.size)) return;
+  if (!(await getStatus()).db) return;
+  try {
+    const r = await api<{ value: { id: string }[] | null }>(`/api/store/${name}`);
+    if (!Array.isArray(r.value) || JSON.stringify(r.value) === JSON.stringify(latest.get(name))) return;
+    latest.set(name, r.value);
+    save(`pine.${name}`, r.value);
+    broadcast(name, r.value);
+  } catch {
+    /* offline: keep what we have */
+  }
+}
+
+/** Save now (e.g. before leaving the page). */
+export function flushAll() {
+  for (const name of pending.keys()) flush(name);
+}
 
 /** A saved list (resources, lessons, feedback…). Seeds the first time; saves ~0.8s after changes. */
-export function useCollection<T>(name: string, seed: T[]) {
+export function useCollection<T extends { id: string }>(name: string, seed: T[]) {
   const key = `pine.${name}`;
   const [items, setItems] = useState<T[]>(seed);
   const [ready, setReady] = useState(false);
-  const loaded = useRef(false);
 
   useEffect(() => {
     let live = true;
     (async () => {
       const local = load<T[] | null>(key, null);
-      let value = local ?? seed;
+      let value = (latest.get(name) as T[] | undefined) ?? local ?? seed;
       const st = await getStatus();
-      if (st.db) {
+      if (st.db && !latest.has(name)) {
         try {
           const r = await api<{ value: T[] | null }>(`/api/store/${name}`);
-          if (Array.isArray(r.value)) value = r.value;
+          const unsaved = load<{ changed: string[]; deleted: string[] } | null>(PK(name), null);
+          if (Array.isArray(r.value) && unsaved && local) {
+            // Edits from last time that never reached the database: merge them in and save.
+            const p = pend(name);
+            unsaved.changed.forEach((id) => p.changed.add(id));
+            unsaved.deleted.forEach((id) => p.deleted.add(id));
+            value = mergeLists(r.value, local, p.changed, p.deleted);
+            latest.set(name, value);
+            flush(name);
+          } else if (Array.isArray(r.value)) value = r.value;
+          else if (local?.length) {
+            // First time online: upload what this browser already has.
+            pend(name);
+            local.forEach((x) => pending.get(name)!.changed.add(x.id));
+            latest.set(name, local);
+            flush(name);
+          }
         } catch {
           /* keep the local copy */
         }
       }
       if (!live) return;
-      loaded.current = true;
-      setItems(value);
+      if (!latest.has(name)) latest.set(name, value);
+      setItems((latest.get(name) as T[]) ?? value);
       setReady(true);
     })();
     const onSync = (e: Event) => {
       const d = (e as CustomEvent).detail as { name: string; value: T[] };
       if (d?.name === name) setItems(d.value);
     };
+    const onFocus = () => {
+      if (document.visibilityState === "visible") pull(name);
+    };
     window.addEventListener("pine:sync", onSync);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("pagehide", flushAll);
     return () => {
       live = false;
       window.removeEventListener("pine:sync", onSync);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("pagehide", flushAll);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
 
   const update = useCallback(
     (fn: (cur: T[]) => T[]) => {
-      setItems((cur) => {
-        const next = fn(cur);
-        save(key, next);
-        clearTimeout(timers.get(name));
-        timers.set(
-          name,
-          setTimeout(async () => {
-            if ((await getStatus()).db) api(`/api/store/${name}`, { method: "PUT", body: JSON.stringify(next) }).catch(() => {});
-          }, 800),
-        );
-        // Let other open components using the same collection see the change.
-        queueMicrotask(() => window.dispatchEvent(new CustomEvent("pine:sync", { detail: { name, value: next } })));
-        return next;
-      });
+      const cur = ((latest.get(name) as T[] | undefined) ?? items) as T[];
+      const next = fn(cur);
+      const d = diffIds(cur, next);
+      const p = pend(name);
+      d.changed.forEach((id) => { p.changed.add(id); p.deleted.delete(id); });
+      d.deleted.forEach((id) => { p.deleted.add(id); p.changed.delete(id); });
+      // Order changes (drag-reorder) count as a change to every item so the new order is saved.
+      if (!d.changed.length && !d.deleted.length && cur.map((x) => x.id).join() !== next.map((x) => x.id).join()) next.forEach((x) => p.changed.add(x.id));
+      latest.set(name, next);
+      save(key, next);
+      rememberPending(name);
+      setItems(next);
+      broadcast(name, next);
+      clearTimeout(timers.get(name));
+      timers.set(name, setTimeout(() => flush(name), 800));
     },
-    [key, name],
+    [key, name, items],
   );
 
   return { items, update, ready };

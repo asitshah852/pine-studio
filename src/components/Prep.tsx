@@ -6,16 +6,18 @@ import { useEffect, useState } from "react";
 import { api, proxied, uid, useCollection, useStatus } from "@/lib/client";
 import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
-import { useJob } from "@/lib/jobs";
+import { forget, recover, useJob } from "@/lib/jobs";
+import { restore, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
 import { caption } from "@/lib/museum";
 import { downloadPptx } from "@/lib/pptx";
 import { addTo, blankSlide, checkItems, readiness, slideFrom, slideState } from "@/lib/slides";
 import { STARTER_RESOURCES } from "@/lib/starter";
 import { OTHER, pad, useStudio } from "@/lib/studio";
-import type { Artwork, Claim, Lesson, ResearchDoc, Resource, Slide } from "@/lib/types";
+import type { Artwork, Claim, Lesson, ResearchDoc, Resource, ReviewDoc, Slide } from "@/lib/types";
 import Claims from "./Claims";
 import Improve from "./Improve";
 import Working from "./Working";
+import Versions from "./Versions";
 import { ExhibitsPanel, FilesPanel, LibraryPanel, TextbookPanel } from "./Panels";
 import SlideView from "./SlideView";
 
@@ -106,8 +108,10 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
     if (doc && !confirm("Replace the current research document with a new one?")) return;
     job.clearError();
     await job.run(async () => {
-      const r = await api<ResearchDoc>("/api/research", { method: "POST", body: JSON.stringify({ topic: lesson.topic, premise: lesson.premise, course }) });
-      set((l) => ({ ...l, research: r }));
+      const key = `research:${lesson.id}`;
+      const r = await api<ResearchDoc>("/api/research", { method: "POST", body: JSON.stringify({ topic: lesson.topic, premise: lesson.premise, course, jobKey: key }) });
+      set((l) => withResearch(l, r));
+      forget(key);
     });
   }
 
@@ -123,6 +127,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
         <div className="row">
           <button className="btn solid" disabled={busy || st?.claude === false} onClick={run}>{busy ? "researching…" : "research this class"}</button>
           <button className="btn ghost" onClick={onNext}>Skip — make slides by hand</button>
+          <Versions lesson={lesson} kind="research" set={set} />
         </div>
         {busy && <Working since={job.started} what="Researching" doing="Searching museum, Smarthistory and scholarly pages, writing the document, then matching exhibits to museum records" usual="2–3 minutes" />}
         {st?.claude === false && <div className="note">Research is off until the Claude key is added in Vercel.</div>}
@@ -139,9 +144,10 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
           <span className="mono mute">Research document · {doc.at.slice(0, 10)}{unsourced ? ` · ${unsourced} paragraph(s) to check` : " · all sourced"}</span>
           <div className="row">
+            <Versions lesson={lesson} kind="research" set={set} />
             <button className="btn sm ghost" onClick={() => downloadDocx(lesson, course)}>Word ↓</button>
             <button className="btn sm ghost" disabled={busy} onClick={run}>{busy ? "researching…" : "redo"}</button>
-            <button className="btn sm ghost" onClick={() => confirm("Delete this research document?") && set((l) => ({ ...l, research: undefined }))}>Delete</button>
+            <button className="btn sm ghost" onClick={() => confirm("Delete this research document? (You can restore it from earlier versions.)") && set((l) => withResearch(l, undefined))}>Delete</button>
           </div>
         </div>
         {busy && <Working since={job.started} what="Researching again" doing="Searching museum, Smarthistory and scholarly pages, writing a new document, then matching exhibits" usual="2–3 minutes" />}
@@ -260,8 +266,10 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
     if (lesson.slides.length && !confirm("Replace the current slides with new ones made from the research?")) return;
     job.clearError();
     await job.run(async () => {
-      const r = await api<{ slides: Slide[] }>("/api/slides", { method: "POST", body: JSON.stringify({ course, number: lesson.number, topic: lesson.topic, premise: lesson.premise, doc: lesson.research, count }) });
-      set((l) => ({ ...l, slides: r.slides }));
+      const key = `slides:${lesson.id}`;
+      const r = await api<{ slides: Slide[] }>("/api/slides", { method: "POST", body: JSON.stringify({ course, number: lesson.number, topic: lesson.topic, premise: lesson.premise, doc: lesson.research, count, jobKey: key }) });
+      set((l) => withSlides(l, r.slides));
+      forget(key);
       setSel(r.slides[0]?.id ?? null);
     });
   }
@@ -302,6 +310,7 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
         </>
       ) : <span className="mute" style={{ fontSize: 16 }}>No research yet — build slides by hand, or do Step 2 first.</span>}
       <button className="btn ghost" onClick={() => { const s = blankSlide("text"); setSlides((x) => [...x, s]); setSel(s.id); }}>+ Blank slide</button>
+      <Versions lesson={lesson} kind="slides" set={set} />
     </div>
   );
 
@@ -337,8 +346,14 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
             </div>
             <SlideView s={slide} n={lesson.number} />
             <div className="stack" style={{ marginTop: 14 }}>
-              <div><label className="label mono">Talking points — on the slide, one per line</label><textarea className="area" rows={4} value={slide.body} onChange={(e) => edit({ body: e.target.value })} /></div>
-              <div><label className="label mono">Speaker notes — for you, in plain language</label><textarea className="area" rows={5} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })} /></div>
+              <div>
+                <label className="label mono">talking points — a few bullets, one per line{slide.artworks.length ? ", linking the research to this work" : ""}</label>
+                <textarea className="area" rows={5} value={slide.body} onChange={(e) => edit({ body: e.target.value })} />
+                <div className="mute" style={{ fontSize: 16, marginTop: 4 }}>{slide.layout === "text" ? "Shown on the slide and in your presenter notes." : slide.layout === "title" ? "Shown under the title." : "In your presenter notes; the slide shows just the work and its caption."}</div>
+              </div>
+              {slide.notes && (
+                <div><label className="label mono">notes from your deck</label><textarea className="area" rows={3} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })} /></div>
+              )}
               {slide.images.length > 0 && (
                 <div className="thumbs">
                   {slide.images.map((im, i) => (
@@ -434,8 +449,10 @@ function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; s
     if (!items.length) return set((l) => ({ ...l, slides: l.slides.map((s) => (ids.has(s.id) ? { ...s, check: { at, claims: [] } } : s)) }));
     job.clearError();
     await job.run(async () => {
-      const res = await api<{ claims: Claim[]; at: string }>("/api/check", { method: "POST", body: JSON.stringify({ items }) });
-      set((l) => ({ ...l, checkedAt: res.at, slides: l.slides.map((s) => (ids.has(s.id) ? { ...s, check: { at: res.at, claims: res.claims.filter((c) => c.slideId === s.id) } } : s)) }));
+      const key = `check:${lesson.id}`;
+      const res = await api<{ claims: Claim[]; at: string }>("/api/check", { method: "POST", body: JSON.stringify({ items, jobKey: key }) });
+      set((l) => withCheck(l, res, [...ids]));
+      forget(key);
     });
   }
 
@@ -516,6 +533,18 @@ export default function Prep() {
   const lesson = creating ? null : lessons.find((l) => l.id === lessonId) ?? null;
   const set = (fn: (l: Lesson) => Lesson) => lesson && updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? fn(l) : l)));
   const course = lesson ? courseName(lesson.courseId) : "";
+
+  // Pick up results that finished while this page was closed or reloaded.
+  useEffect(() => {
+    if (!ready || !lessonId) return;
+    const id = lessonId;
+    const upd = (fn: (l: Lesson) => Lesson) => updateLessons((cur) => cur.map((l) => (l.id === id ? fn(l) : l)));
+    recover(`research:${id}`, (d) => upd((l) => withResearch(l, d as ResearchDoc)));
+    recover(`slides:${id}`, (d) => upd((l) => withSlides(l, d as Slide[])));
+    recover(`review:${id}`, (d) => upd((l) => withReview(l, d as ReviewDoc)));
+    recover(`check:${id}`, (d, m) => upd((l) => withCheck(l, d as { claims: Claim[]; at: string }, ((m as { ids?: string[] } | null)?.ids ?? []).filter(Boolean))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, lessonId]);
 
   function saveBrief(b: { courseId: string; newCourse?: string; number: number; topic: string; premise: string }) {
     let courseId = b.courseId;

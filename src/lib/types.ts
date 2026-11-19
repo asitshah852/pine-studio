@@ -96,6 +96,16 @@ export type ReviewDoc = {
   exhibits: ExhibitSuggestion[];
 };
 
+export type Version = {
+  id: string;
+  kind: "research" | "slides" | "review";
+  at: string; // when it was replaced
+  label: string; // e.g. "research from 19 Nov, 14:02"
+  research?: ResearchDoc;
+  slides?: Slide[];
+  review?: ReviewDoc;
+};
+
 export type Lesson = {
   id: string;
   courseId: string;
@@ -105,6 +115,7 @@ export type Lesson = {
   research?: ResearchDoc;
   materials?: Material[]; // files she uploaded (her existing class materials)
   review?: ReviewDoc; // "suggest improvements"
+  versions?: Version[]; // earlier research / slides / reviews, newest first (restore from Prep)
   readings: string[]; // resource ids
   slides: Slide[];
   status: "draft" | "ready";

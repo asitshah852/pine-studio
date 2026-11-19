@@ -7,7 +7,9 @@ import { ACCEPT, importFile } from "@/lib/importers";
 import { applySuggestion, discussionSlide } from "@/lib/slides";
 import { pad } from "@/lib/studio";
 import Working from "./Working";
-import { useJob } from "@/lib/jobs";
+import Versions from "./Versions";
+import { forget, useJob } from "@/lib/jobs";
+import { withReview } from "@/lib/lessonOps";
 import type { Lesson, Material, ReviewDoc, Slide, Suggestion } from "@/lib/types";
 
 const KIND: Record<Suggestion["kind"], string> = {
@@ -77,9 +79,11 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
           premise: lesson.premise,
           slides: lesson.slides.map((s) => ({ id: s.id, title: s.title, body: s.body, notes: s.notes })),
           materials,
+          jobKey: `review:${lesson.id}`,
         }),
       });
-      set((l) => ({ ...l, review: r }));
+      set((l) => withReview(l, r));
+      forget(`review:${lesson.id}`);
     });
   }
 
@@ -117,6 +121,7 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
         <h2 style={{ margin: 0 }}>Suggest improvements</h2>
         <div className="row">
+          <Versions lesson={lesson} kind="review" set={set} />
           <UploadButton label="+ add materials" onFiles={upload} busy={uploading} />
           <button className="btn solid" disabled={busy || st?.claude === false || (!lesson.slides.length && !mats.length)} onClick={run}>
             {busy ? "reviewing…" : rv ? "review again" : "suggest improvements"}
