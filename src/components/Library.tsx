@@ -23,6 +23,7 @@ const blank = { kind: "textbook" as ResourceKind, title: "", url: "", author: ""
 export default function Library() {
   const { items, update } = useCollection<Resource>("resources", STARTER_RESOURCES);
   const [q, setQ] = useState("");
+  const [onlySaved, setOnlySaved] = useState(false);
   const [form, setForm] = useState(blank);
   const [formOpen, setFormOpen] = useState(false);
   const [moreFields, setMoreFields] = useState(false);
@@ -62,8 +63,9 @@ export default function Library() {
 
   const shown = useMemo(() => {
     const t = q.toLowerCase().trim();
-    return items.filter((r) => !t || `${r.title} ${r.author ?? ""} ${r.publisher ?? ""} ${r.topics.join(" ")} ${r.notes}`.toLowerCase().includes(t));
-  }, [items, q]);
+    return items.filter((r) => (!onlySaved || r.pdf) && (!t || `${r.title} ${r.author ?? ""} ${r.publisher ?? ""} ${r.topics.join(" ")} ${r.notes}`.toLowerCase().includes(t)));
+  }, [items, q, onlySaved]);
+  const savedCount = items.filter((r) => r.pdf).length;
 
   // Each resource goes in the first section it fits.
   const grouped = useMemo(() => {
@@ -121,6 +123,16 @@ export default function Library() {
         <input className="input" placeholder="Search the library…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the library" />
         {!formOpen && <button className="btn" onClick={() => openForm()}>+ add a resource</button>}
       </div>
+      <div className="savedsum mute">
+        {savedCount ? (
+          <>
+            <span className="savedtag static">saved</span> {savedCount} book{savedCount === 1 ? "" : "s"} stored in pine studio ·{" "}
+            <button className="linkish" onClick={() => setOnlySaved(!onlySaved)}>{onlySaved ? "show everything" : "show only saved"}</button>
+          </>
+        ) : (
+          <>Nothing stored yet. Hover over a free textbook and click <b>save a PDF copy</b>.</>
+        )}
+      </div>
 
       {formOpen && (
         <form className="lib-form" onSubmit={submit}>
@@ -160,7 +172,10 @@ export default function Library() {
           {g.list.map((r) => (
             <article key={r.id} className="lib-item" title={r.starter ? "From the starter list, checked 19 Nov 2026 — confirm the edition or access." : undefined}>
               <div className="lib-main">
-                <h3>{r.url ? <a href={r.url} target="_blank" rel="noreferrer">{r.title}</a> : r.title}</h3>
+                <h3>
+                  {r.url ? <a href={r.url} target="_blank" rel="noreferrer">{r.title}</a> : r.title}
+                  {r.pdf && <a className="savedtag" href={pdfUrl(r.pdf.path)} target="_blank" rel="noreferrer" title="Your stored copy — click to open">saved</a>}
+                </h3>
                 {(r.author || r.publisher || r.year) && <div className="src">{[r.author, r.publisher, r.year].filter(Boolean).join(" · ")}</div>}
                 {r.notes && <p>{r.notes}</p>}
                 {r.pdf && (
