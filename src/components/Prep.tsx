@@ -7,17 +7,18 @@ import { api, proxied, uid, useCollection, useStatus } from "@/lib/client";
 import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
 import { forget, recover, useJob } from "@/lib/jobs";
-import { restore, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
+import { restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
 import { caption } from "@/lib/museum";
 import { downloadPptx } from "@/lib/pptx";
 import { addTo, blankSlide, checkItems, readiness, slideFrom, slideState } from "@/lib/slides";
 import { STARTER_RESOURCES } from "@/lib/starter";
 import { OTHER, pad, useStudio } from "@/lib/studio";
-import type { Artwork, Claim, Lesson, ResearchDoc, Resource, ReviewDoc, Slide } from "@/lib/types";
+import type { Artwork, ChatOp, Claim, Lesson, ResearchDoc, Resource, ReviewDoc, Slide, Source } from "@/lib/types";
 import Claims from "./Claims";
 import Improve from "./Improve";
 import Working from "./Working";
 import Versions from "./Versions";
+import Talk from "./Talk";
 import { ExhibitsPanel, FilesPanel, LibraryPanel, TextbookPanel } from "./Panels";
 import SlideView from "./SlideView";
 
@@ -234,7 +235,6 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
 
       <div className="nextbar">
         <span className="mute">{chosen} exhibit(s) chosen · {doc.questions.length} questions</span>
-        <button className="btn solid" onClick={onNext}>Next: make slides →</button>
       </div>
     </div>
   );
@@ -423,7 +423,6 @@ function SlidesStep({ lesson, course, set, resources, onNext }: { lesson: Lesson
       </div>
       <div className="nextbar">
         <span className="mute">Drag frames to reorder. Everything saves automatically.</span>
-        <button className="btn solid" onClick={onNext}>Next: check & finish →</button>
       </div>
     </>
   );
@@ -519,6 +518,7 @@ export default function Prep() {
   const [lessonId, setLessonId] = useState<string | null>(null);
   const [step, setStep] = useState<Step>(1);
   const [creating, setCreating] = useState(false);
+  const [talk, setTalk] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
@@ -542,6 +542,7 @@ export default function Prep() {
     recover(`research:${id}`, (d) => upd((l) => withResearch(l, d as ResearchDoc)));
     recover(`slides:${id}`, (d) => upd((l) => withSlides(l, d as Slide[])));
     recover(`review:${id}`, (d) => upd((l) => withReview(l, d as ReviewDoc)));
+    recover(`chat:${id}`, (d) => upd((l) => withChat(l, undefined, d as { reply: string; sources: Source[]; ops: ChatOp[] })));
     recover(`check:${id}`, (d, m) => upd((l) => withCheck(l, d as { claims: Claim[]; at: string }, ((m as { ids?: string[] } | null)?.ids ?? []).filter(Boolean))));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, lessonId]);
@@ -570,7 +571,7 @@ export default function Prep() {
   const byCourse = courses.map((c) => ({ c, ls: lessons.filter((l) => l.courseId === c.id).sort((a, b) => a.number - b.number) })).filter((g) => g.ls.length);
 
   return (
-    <main className="page">
+    <main className={`page ${talk && lesson ? "withtalk" : ""}`}>
       <div className="head" style={{ marginBottom: 18 }}>
         <div className="grow">
           <div className="mono mute">{lesson ? `${course} · Class ${pad(lesson.number)}${lesson.status === "ready" ? " · in Classes" : ""}${lesson.example ? " · example" : ""}` : "New class"}</div>
@@ -607,6 +608,15 @@ export default function Prep() {
       {lesson && step === 2 && <ResearchStep lesson={lesson} course={course} set={set} onNext={() => setStep(3)} />}
       {lesson && step === 3 && <SlidesStep lesson={lesson} course={course} set={set} resources={resources} onNext={() => setStep(4)} />}
       {lesson && step === 4 && <FinishStep lesson={lesson} course={course} set={set} />}
+
+      {lesson && (
+        <div className="stepnav">
+          {step > 1 ? <button className="btn" onClick={() => setStep((step - 1) as Step)}>← back: {steps[step - 2][1].toLowerCase()}</button> : <span />}
+          {step < 4 && <button className="btn solid" onClick={() => setStep((step + 1) as Step)}>next: {steps[step][1].toLowerCase()} →</button>}
+        </div>
+      )}
+      {lesson && !talk && <button className="talk-open btn solid" onClick={() => setTalk(true)}>talk it through</button>}
+      {lesson && talk && <Talk key={lesson.id} lesson={lesson} course={course} set={set} close={() => setTalk(false)} />}
 
       {lesson && step === 1 && (
         <p className="mute" style={{ fontSize: 16, marginTop: 14 }}>

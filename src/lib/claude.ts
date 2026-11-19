@@ -8,7 +8,7 @@ export const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
 export const claudeOn = () => Boolean(process.env.ANTHROPIC_API_KEY) && process.env.CLAUDE_OFF !== "1";
 
 let client: Anthropic | null = null;
-const getClient = () => (client ??= new Anthropic());
+export const getClient = () => (client ??= new Anthropic());
 
 export class NoClaude extends Error {
   constructor() {

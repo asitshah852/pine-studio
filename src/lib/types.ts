@@ -106,6 +106,27 @@ export type Version = {
   review?: ReviewDoc;
 };
 
+export type ChatOp =
+  | { op: "edit_slide"; label: string; slideId: string; title?: string; body?: string; layout?: Slide["layout"] }
+  | { op: "add_slide"; label: string; afterId?: string; title: string; body: string; layout?: Slide["layout"] }
+  | { op: "delete_slide"; label: string; slideId: string }
+  | { op: "move_slide"; label: string; slideId: string; to: number }
+  | { op: "edit_paragraph"; label: string; paragraphId: string; text: string }
+  | { op: "add_paragraph"; label: string; sectionId?: string; heading?: string; text: string; sources: Source[]; verified: boolean }
+  | { op: "add_question"; label: string; text: string }
+  | { op: "add_exhibit"; label: string; artwork: Artwork; why: string; slideId?: string };
+
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  at: string;
+  sources?: Source[]; // pages Claude cited in its reply
+  ops?: string[]; // what it changed (labels)
+  undo?: { slides: Slide[]; research?: ResearchDoc }; // kept on the latest change only
+  undone?: boolean;
+};
+
 export type Lesson = {
   id: string;
   courseId: string;
@@ -115,6 +136,7 @@ export type Lesson = {
   research?: ResearchDoc;
   materials?: Material[]; // files she uploaded (her existing class materials)
   review?: ReviewDoc; // "suggest improvements"
+  chat?: ChatMessage[]; // "talk it through" conversation (last 40)
   versions?: Version[]; // earlier research / slides / reviews, newest first (restore from Prep)
   readings: string[]; // resource ids
   slides: Slide[];

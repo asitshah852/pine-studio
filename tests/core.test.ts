@@ -112,3 +112,30 @@ test("replacing research or slides keeps the old one to restore", async () => {
   l = restore(l, l.versions!.find((v) => v.kind === "slides")!);
   assert.equal(l.slides[0].title, "A");
 });
+
+test("chat changes apply to slides and research, and undo restores them", async () => {
+  const { withChat, undoChat } = await import("../src/lib/lessonOps");
+  const a = blankSlide("text", "One");
+  const b = blankSlide("text", "Two");
+  const l0: import("../src/lib/types").Lesson = { id: "l", courseId: "c", number: 1, topic: "t", premise: "", readings: [], slides: [a, b], status: "draft" };
+  const user = { id: "u1", role: "user" as const, text: "go", at: "t" };
+  const l1 = withChat(l0, user, {
+    reply: "Done.",
+    sources: [],
+    ops: [
+      { op: "edit_slide", label: "Edited slide 1", slideId: a.id, title: "One, better" },
+      { op: "add_slide", label: "Added", afterId: a.id, title: "New", body: "x\ny" },
+      { op: "move_slide", label: "Moved", slideId: b.id, to: 1 },
+      { op: "add_exhibit", label: "Added work", artwork: art(), why: "fits", slideId: a.id },
+      { op: "add_paragraph", label: "Added research", text: "Fact.", sources: [], verified: false },
+    ],
+  });
+  assert.deepEqual(l1.slides.map((s) => s.title), ["Two", "One, better", "New"]);
+  assert.equal(l1.slides[1].layout, "artwork");
+  assert.equal(l1.research?.exhibits.length, 1);
+  assert.equal(l1.research?.sections[0].paragraphs[0].verified, false);
+  assert.equal(l1.chat?.length, 2);
+  const back = undoChat(l1, l1.chat![1].id);
+  assert.deepEqual(back.slides.map((s) => s.title), ["One", "Two"]);
+  assert.equal(back.research, undefined);
+});
