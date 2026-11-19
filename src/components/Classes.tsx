@@ -194,7 +194,7 @@ export default function Classes() {
         const ls = lessons.filter((l) => l.courseId === c.id).sort((a, b) => a.number - b.number);
         if (c.id === OTHER && !ls.length) return null;
         return (
-          <section key={c.id} className="course">
+          <section key={c.id} id={`c-${c.id}`} className="course">
             <div className="coursehead">
               <h2>{c.name}</h2>
               <div className="row">

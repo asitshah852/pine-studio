@@ -122,7 +122,7 @@ export default function Library() {
           </div>
         </section>
 
-        <aside className="card" style={{ position: "sticky", top: 84 }}>
+        <aside className="card" style={{ position: "sticky", top: 24 }}>
           <h2>{editing ? "Edit resource" : "Add a resource"}</h2>
           <form className="stack" onSubmit={submit}>
             <div>

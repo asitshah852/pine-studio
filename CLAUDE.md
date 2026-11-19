@@ -11,9 +11,11 @@
 - Name: **pine studio** (always lower case). Repo `asitshah852/pine-studio`, separate from other projects.
 - Tabs (Asit, Nov 2026): Classes (by course) · Prep (1 Brief → 2 Research doc + questions + exhibits → 3 auto slides with talking points & plain-language speaker notes → 4 Check & finish) · Library · Checker · Feedback. See README.md.
 - Prep brief is just course, class number, topic and premise (no dates/units).
-- Design: minimalist black & white, photographic (Instrument Serif / Inter / JetBrains Mono,
-  grayscale thumbnails that turn colour on hover, film-strip slide sorter, "Darkroom" dark mode).
-  Only ✗ errors get colour (safelight red).
+- Design (Asit, Nov 2026): match Tanya's own artist website — white page, Cormorant Garamond for
+  everything (wordmark "pine studio" all one font, letterspaced, lower case), left-hand menu with
+  lowercase links and courses listed under "classes", current page in grey, no boxes or borders,
+  quiet underlined text buttons (main action in a hairline frame), photographs in full colour.
+  "Darkroom" dark mode. Only ✗ errors get colour.
 
 ## Non-negotiable rules
 1. **Fact-check everything; never make anything up** — in the app and in Claude's own work.
