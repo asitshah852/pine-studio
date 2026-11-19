@@ -3,10 +3,11 @@
 // (with sources), find museum exhibits, and change the research document and slides — each change
 // listed under the reply, with undo.
 import { useEffect, useRef, useState } from "react";
-import { api, uid, useStatus } from "@/lib/client";
+import { apiJob, uid, useStatus } from "@/lib/client";
 import { forget, useJob } from "@/lib/jobs";
 import { undoChat, withChat } from "@/lib/lessonOps";
 import type { ChatMessage, ChatOp, Lesson, Source } from "@/lib/types";
+import Rich from "./Rich";
 import Working from "./Working";
 
 const STARTERS = [
@@ -38,10 +39,7 @@ export default function Talk({ lesson, course, set, close, onActions }: { lesson
     const { chat: _c, versions: _v, materials: _m, review: _r, ...slim } = lesson;
     job.clearError();
     await job.run(async () => {
-      const r = await api<{ reply: string; sources: Source[]; ops: ChatOp[] }>("/api/chat", {
-        method: "POST",
-        body: JSON.stringify({ lesson: slim, course, history, message: m, jobKey: key }),
-      });
+      const r = await apiJob<{ reply: string; sources: Source[]; ops: ChatOp[] }>("/api/chat", { lesson: slim, course, history, message: m, jobKey: key });
       set((l) => withChat(l, user, r));
       forget(key);
       onActions?.(r.ops);
@@ -67,7 +65,7 @@ export default function Talk({ lesson, course, set, close, onActions }: { lesson
         )}
         {msgs.map((m) => (
           <div key={m.id} className={`msg ${m.role}`}>
-            <div style={{ whiteSpace: "pre-wrap" }}>{m.text}</div>
+            {m.role === "assistant" ? <Rich text={m.text} /> : <div style={{ whiteSpace: "pre-wrap" }}>{m.text}</div>}
             {m.ops?.length ? (
               <ul className="ops">{m.ops.map((o, i) => <li key={i}>{m.undone ? <s>{o}</s> : o}</li>)}</ul>
             ) : null}

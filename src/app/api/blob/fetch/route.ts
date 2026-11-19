@@ -5,6 +5,8 @@ import { put } from "@vercel/blob";
 import { denied, passcodeOk } from "@/lib/auth";
 import { blobAuth, blobOn } from "@/lib/blob";
 import { nextPages, pdfLinks } from "@/lib/pdflinks";
+import { attachToResource, pdfText, saveTextServer, type StoredPdf } from "@/lib/pdfServer";
+import { background } from "@/lib/results";
 
 export const maxDuration = 300;
 const MAX = 300 * 1024 * 1024;
@@ -46,7 +48,7 @@ async function open(url: string) {
 export async function POST(req: Request) {
   if (!passcodeOk(req)) return denied();
   if (!blobOn()) return Response.json({ error: "PDF storage isn't switched on yet (Vercel → Storage → Blob)." }, { status: 503 });
-  const { url, name } = (await req.json()) as { url?: string; name?: string };
+  const { url, name, resourceId, jobKey } = (await req.json()) as { url?: string; name?: string; resourceId?: string; jobKey?: string };
   let u: URL;
   try {
     u = new URL(String(url).trim());
@@ -55,22 +57,32 @@ export async function POST(req: Request) {
   }
   if (u.protocol !== "https:") return Response.json({ error: "Use an https:// link." }, { status: 400 });
 
+  // The whole job — find, download, store, read the text, file it under the book — runs in the
+  // background, so the page can be closed.
+  try {
+    return Response.json(await background(jobKey, { resourceId }, () => savePdf(u, name, resourceId)));
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 400 });
+  }
+}
+
+async function savePdf(u: URL, name: string | undefined, resourceId: string | undefined): Promise<StoredPdf> {
   let r = await open(u.toString());
-  if (!r?.ok) return Response.json({ error: `Couldn't open that link (${r ? r.status : "no answer"}).` }, { status: 400 });
+  if (!r?.ok) throw new Error(`Couldn't open that link (${r ? r.status : "no answer"}).`);
   if (!isPdf(r)) {
-    // A web page: look for its PDF download link (and one step beyond it).
     const html = (await r.text()).slice(0, 3_000_000);
     const found = await findPdf(html, r.url);
-    if (!found) return Response.json({ error: "Couldn't find a PDF on that page. Open the page, find its PDF (often “Download PDF” or “Download”), right-click it, choose “Copy link address”, and paste that instead." }, { status: 400 });
+    if (!found) throw new Error("Couldn't find a PDF on that page. Open the page, find its PDF (often “Download PDF” or “Download”), right-click it, choose “Copy link address”, and paste that instead.");
     r = found;
   }
-  const size = Number(r.headers.get("content-length") || 0);
-  if (size > MAX) return Response.json({ error: "That PDF is over 300 MB." }, { status: 400 });
+  const declared = Number(r.headers.get("content-length") || 0);
+  if (declared > MAX) throw new Error("That PDF is over 300 MB.");
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  if (bytes.byteLength > MAX) throw new Error("That PDF is over 300 MB.");
   const safe = (name || u.pathname.split("/").pop() || "textbook").replace(/[^\w.\- ()]/g, "_").replace(/\.pdf$/i, "").slice(0, 80) + ".pdf";
-  try {
-    const blob = await put(`textbooks/${safe}`, r.body!, { access: "private", addRandomSuffix: true, contentType: "application/pdf", multipart: true, ...blobAuth() });
-    return Response.json({ path: blob.pathname, size, name: safe, from: r.url });
-  } catch (e) {
-    return Response.json({ error: (e as Error).message }, { status: 500 });
-  }
+  const blob = await put(`textbooks/${safe}`, Buffer.from(bytes), { access: "private", addRandomSuffix: true, contentType: "application/pdf", multipart: bytes.byteLength > 20e6, ...blobAuth() });
+  const { pages, text } = await pdfText(bytes);
+  const pdf: StoredPdf = { path: blob.pathname, name: safe, size: bytes.byteLength, pages, textId: text ? await saveTextServer(text) : undefined };
+  if (resourceId) await attachToResource(resourceId, pdf);
+  return pdf;
 }

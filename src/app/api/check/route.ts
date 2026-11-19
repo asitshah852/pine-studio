@@ -1,6 +1,6 @@
 import { denied, passcodeOk } from "@/lib/auth";
 import { factCheck, type CheckInput } from "@/lib/prompts";
-import { keep } from "@/lib/results";
+import { background } from "@/lib/results";
 import type { Claim } from "@/lib/types";
 
 export const maxDuration = 300;
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!items.length && !uploads.length) return Response.json({ error: "Nothing to check yet." }, { status: 400 });
   try {
     return Response.json(
-      await keep(body.jobKey, { ids: items.map((i) => i.id) }, async () => {
+      await background(body.jobKey, { ids: items.map((i) => i.id) }, async () => {
         const at = new Date().toISOString();
         if (uploads.length || items.length <= BATCH) return { claims: await factCheck(items, uploads), at, checked: items.map((i) => i.id) };
         const batches: CheckInput[] = [];

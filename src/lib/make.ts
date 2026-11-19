@@ -1,7 +1,7 @@
 "use client";
 // The class-making steps, shared by the step-by-step buttons and the one-click "make my class".
 // Each request carries a job key, so a result that finishes after the page closed is picked up later.
-import { api, load } from "./client";
+import { apiJob, load } from "./client";
 import { textbookExcerpts } from "./textbooks";
 import { forget } from "./jobs";
 import { withCheck, withResearch, withSlides } from "./lessonOps";
@@ -18,7 +18,7 @@ export async function runResearch(l: Lesson, course: string, set: Set): Promise<
   // Her stored textbooks: the pages that best match the topic go along as a source.
   const books = load<Resource[]>("pine.resources", []);
   const excerpts = await textbookExcerpts(`${l.topic} ${l.premise}`, books).catch(() => []);
-  const r = await api<ResearchDoc>("/api/research", { method: "POST", body: JSON.stringify({ topic: l.topic, premise: l.premise, course, minutes: l.minutes, excerpts, jobKey: key }) });
+  const r = await apiJob<ResearchDoc>("/api/research", { topic: l.topic, premise: l.premise, course, minutes: l.minutes, excerpts, jobKey: key });
   set((x) => withResearch(x, r));
   forget(key);
   return r;
@@ -26,10 +26,7 @@ export async function runResearch(l: Lesson, course: string, set: Set): Promise<
 
 export async function runSlides(l: Lesson, course: string, set: Set, count = slideCount(l.minutes)): Promise<Slide[]> {
   const key = `slides:${l.id}`;
-  const r = await api<{ slides: Slide[] }>("/api/slides", {
-    method: "POST",
-    body: JSON.stringify({ course, number: l.number, topic: l.topic, premise: l.premise, minutes: l.minutes, doc: l.research, count, jobKey: key }),
-  });
+  const r = await apiJob<{ slides: Slide[] }>("/api/slides", { course, number: l.number, topic: l.topic, premise: l.premise, minutes: l.minutes, doc: l.research, count, jobKey: key });
   set((x) => withSlides(x, r.slides));
   forget(key);
   return r.slides;
@@ -43,7 +40,7 @@ export async function runCheck(l: Lesson, set: Set, all = false): Promise<void> 
   const at = new Date().toISOString();
   if (!items.length) return set((x) => withCheck(x, { claims: [], at }, ids));
   const key = `check:${l.id}`;
-  const res = await api<{ claims: Claim[]; at: string; checked?: string[] }>("/api/check", { method: "POST", body: JSON.stringify({ items, jobKey: key }) });
+  const res = await apiJob<{ claims: Claim[]; at: string; checked?: string[] }>("/api/check", { items, jobKey: key });
   const done = new Set(res.checked ?? ids);
   // Only mark slides that haven't been edited again while the check ran.
   const sent = new Map(targets.map((t) => [t.id, JSON.stringify([t.title, t.body, t.notes])]));

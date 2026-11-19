@@ -56,6 +56,32 @@ export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
   return j as T;
 }
 
+// ── Background jobs ─────────────────────────────────────────────────────────
+/** Wait for a background job's stored result (polls every 4 s, up to 10 minutes). */
+export async function waitResult<T>(key: string, maxMs = 10 * 60_000): Promise<T> {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    await new Promise((ok) => setTimeout(ok, 4000));
+    let r: { result: { status: string; data?: T; error?: string } | null } | null = null;
+    try {
+      r = await api(`/api/result?key=${encodeURIComponent(key)}`);
+    } catch {
+      continue; // a network blip: keep waiting
+    }
+    if (!r?.result) throw new Error("That job's result went missing — please try again.");
+    if (r.result.status === "done") return r.result.data as T;
+    if (r.result.status === "failed") throw new Error(r.result.error || "That didn't work — please try again.");
+  }
+  throw new Error("This is taking much longer than usual. It may still finish — reopen this page in a few minutes.");
+}
+
+/** Start a long job; if the server runs it in the background, wait for its result. */
+export async function apiJob<T>(url: string, body: Record<string, unknown> & { jobKey: string }): Promise<T> {
+  const r = await api<T | { queued: true; jobKey: string }>(url, { method: "POST", body: JSON.stringify(body) });
+  if (r && typeof r === "object" && "queued" in r && (r as { queued?: boolean }).queued) return waitResult<T>(body.jobKey);
+  return r as T;
+}
+
 // ── Saving ───────────────────────────────────────────────────────────────
 // Each list is kept in this browser at once and saved online ~0.8 s later. Before saving, the
 // online copy is fetched and merged (see merge.ts), so two devices never wipe each other's work.

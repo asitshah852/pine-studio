@@ -218,3 +218,10 @@ test("'use this wording' swaps the suggested fix into the slide and re-checks it
   assert.equal(next.slides[0].check, undefined);
   assert.equal(applyFix({ ...l, slides: [{ ...sl, body: "different words" }] }, sl.id, 0), null);
 });
+
+test("YouTube links of every common shape give the video id", async () => {
+  const { videoId } = await import("../src/lib/sources");
+  for (const u of ["https://www.youtube.com/watch?v=W8r-tXRLazs", "https://youtu.be/W8r-tXRLazs?t=3", "https://www.youtube.com/watch?list=x&v=W8r-tXRLazs", "https://youtube.com/shorts/W8r-tXRLazs", "https://www.youtube.com/embed/W8r-tXRLazs"])
+    assert.equal(videoId(u), "W8r-tXRLazs");
+  assert.equal(videoId("https://example.org/watch?v=W8r-tXRLazs"), null);
+});

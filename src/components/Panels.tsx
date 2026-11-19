@@ -116,13 +116,13 @@ export function ExhibitsPanel({ q, setQ, onAdd, addLabel = "+ Add" }: { q: strin
   return (
     <div className="stack">
       <form className="row" onSubmit={(e) => { e.preventDefault(); const v = new FormData(e.currentTarget).get("q") as string; setQ(v); search(v); }}>
-        <input name="q" className="input grow" defaultValue={q} key={q} placeholder="Artist, title, movement… e.g. Seurat" />
+        <input name="q" className="input grow" defaultValue={q} key={q} placeholder="Artist, title, movement… or paste a YouTube link" />
         <button className="btn solid" disabled={busy}>{busy ? "…" : "Search"}</button>
       </form>
       <div className="row" style={{ justifyContent: "space-between" }}>
         <span className="row" style={{ gap: 4 }}>
           {([["all", "museums + library of congress"], ["museums", "museums"], ["loc", "library of congress"], ["youtube", "youtube"]] as const).map(([k, label]) => (
-            <button type="button" key={k} className={`chip ${src === k ? "on" : ""}`} onClick={() => setSrc(k)} disabled={k === "youtube" && st?.youtube === false} title={k === "youtube" && st?.youtube === false ? "Add YOUTUBE_API_KEY in Vercel to switch this on" : ""}>{label}</button>
+            <button type="button" key={k} className={`chip ${src === k ? "on" : ""}`} onClick={() => setSrc(k)} title={k === "youtube" && st?.youtube === false ? "YouTube search needs the key in Vercel — pasting a video link works without it" : ""}>{label}</button>
           ))}
         </span>
         <label className="mono mute"><input type="checkbox" checked={pdOnly} onChange={(e) => setPdOnly(e.target.checked)} /> public domain only</label>

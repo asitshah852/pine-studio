@@ -1,7 +1,7 @@
 "use client";
 // "Suggest improvements" for a class she has already taught, plus her uploaded materials.
 import { useEffect, useRef, useState } from "react";
-import { api, proxied, useStatus } from "@/lib/client";
+import { apiJob, proxied, useStatus } from "@/lib/client";
 import { loadText } from "@/lib/files";
 import { ACCEPT, importFile } from "@/lib/importers";
 import { applySuggestion, discussionSlide } from "@/lib/slides";
@@ -70,9 +70,7 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
     job.clearError();
     await job.run(async () => {
       const materials = await Promise.all(mats.map(async (m) => ({ name: m.name, text: await loadText(m.fileId, m.preview) })));
-      const r = await api<ReviewDoc>("/api/review", {
-        method: "POST",
-        body: JSON.stringify({
+      const r = await apiJob<ReviewDoc>("/api/review", {
           course,
           number: lesson.number,
           topic: lesson.topic,
@@ -80,7 +78,6 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
           slides: lesson.slides.map((s) => ({ id: s.id, title: s.title, body: s.body, notes: s.notes })),
           materials,
           jobKey: `review:${lesson.id}`,
-        }),
       });
       set((l) => withReview(l, r));
       forget(`review:${lesson.id}`);

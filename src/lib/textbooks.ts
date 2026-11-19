@@ -1,53 +1,39 @@
 "use client";
 // Her own textbook PDFs: upload to private storage, keep the text for Prep's Textbook tool.
 import { upload } from "@vercel/blob/client";
-import { api, getPass } from "./client";
-import { loadText, saveText } from "./files";
+import { apiJob, getPass } from "./client";
+import { loadText } from "./files";
 
-export async function uploadTextbook(file: File, onProgress: (s: string) => void) {
+export async function uploadTextbook(file: File, onProgress: (s: string) => void, resourceId = "") {
   const safe = file.name.replace(/[^\w.\- ()]/g, "_").replace(/\.pdf$/i, "") + ".pdf";
-  onProgress("Uploading… 0%");
+  onProgress("uploading… 0% (keep this tab open until 100%)");
   const blob = await upload(`textbooks/${safe}`, file, {
     access: "private",
     handleUploadUrl: "/api/blob/upload",
     headers: { "x-pine-passcode": getPass() },
     multipart: file.size > 20 * 1024 * 1024,
-    onUploadProgress: (p) => onProgress(`Uploading… ${Math.round(p.percentage)}%`),
+    onUploadProgress: (p) => onProgress(`uploading… ${Math.round(p.percentage)}% (keep this tab open until 100%)`),
   });
-  onProgress("Reading the pages…");
-  let pages: number | undefined;
-  let textId: string | undefined;
-  try {
-    const { extractText, getDocumentProxy } = await import("unpdf");
-    const pdf = await getDocumentProxy(new Uint8Array(await file.arrayBuffer()));
-    const { text, totalPages } = await extractText(pdf, { mergePages: false });
-    pages = totalPages;
-    textId = await saveText(text.map((t, i) => `--- Page ${i + 1} ---\n${t.trim()}`).join("\n\n"));
-  } catch {
-    /* a scanned PDF with no text layer: the file is still stored */
-  }
-  return { path: blob.pathname, name: file.name, size: file.size, pages, textId };
+  onProgress("reading the pages (in the background)…");
+  return apiJob<{ path: string; name: string; size: number; pages?: number; textId?: string }>("/api/blob/extract", {
+    path: blob.pathname,
+    name: file.name,
+    size: file.size,
+    resourceId,
+    jobKey: `pdf:${resourceId || blob.pathname.replace(/[^\w-]/g, "").slice(-40)}`,
+  });
 }
 
-/** Read a stored PDF's pages and keep the text (for Prep's Textbook tool). */
-async function readStored(path: string): Promise<{ pages?: number; textId?: string }> {
-  try {
-    const r = await fetch(pdfUrl(path));
-    const { extractText, getDocumentProxy } = await import("unpdf");
-    const pdf = await getDocumentProxy(new Uint8Array(await r.arrayBuffer()));
-    const { text, totalPages } = await extractText(pdf, { mergePages: false });
-    return { pages: totalPages, textId: await saveText(text.map((t, i) => `--- Page ${i + 1} ---\n${t.trim()}`).join("\n\n")) };
-  } catch {
-    return {};
-  }
-}
-
-/** Save an openly licensed PDF from a download link. */
-export async function saveFromLink(url: string, name: string, onProgress: (s: string) => void) {
-  onProgress("Downloading the PDF…");
-  const r = await api<{ path: string; size: number; name: string }>("/api/blob/fetch", { method: "POST", body: JSON.stringify({ url, name }) });
-  onProgress("Reading the pages…");
-  return { path: r.path, name: r.name, size: r.size, ...(await readStored(r.path)) };
+/** Save an openly licensed PDF from a link (or the book's page). The server does it all in the
+ *  background — find, download, store, read the text, file it under the book. */
+export async function saveFromLink(url: string, name: string, onProgress: (s: string) => void, resourceId = "") {
+  onProgress("finding and saving the PDF (in the background)…");
+  return apiJob<{ path: string; name: string; size: number; pages?: number; textId?: string }>("/api/blob/fetch", {
+    url,
+    name,
+    resourceId,
+    jobKey: `pdf:${resourceId || "link"}`,
+  });
 }
 
 export const pdfUrl = (path: string) => `/api/blob/file?path=${encodeURIComponent(path)}`;

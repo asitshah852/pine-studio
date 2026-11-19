@@ -129,3 +129,34 @@ export async function findVideo(title: string, artist: string): Promise<Artwork 
   const rank = (a: Artwork) => (/vevo|official/i.test(a.artist) ? 0 : 1);
   return hits.filter((h) => isMatch({ ...h, artist: `${h.artist} ${h.title}` }, title, artist)).sort((a, b) => rank(a) - rank(b))[0];
 }
+
+/* ── A YouTube video from its link (no key needed) ──
+   Uses YouTube's public oEmbed service (the official "link preview" endpoint). */
+export function videoId(link: string): string | null {
+  const m = link.trim().match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/i);
+  return m ? m[1] : null;
+}
+
+export async function videoFromLink(link: string): Promise<Artwork> {
+  const id = videoId(link);
+  if (!id) throw new Error("That isn't a YouTube video link.");
+  const watch = `https://www.youtube.com/watch?v=${id}`;
+  const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(watch)}`, { next: { revalidate: 86400 } });
+  if (r.status === 401 || r.status === 403) throw new Error("That video can't be embedded (its owner has turned embedding off). Try another copy, ideally from the official channel.");
+  if (!r.ok) throw new Error("Couldn't find that video — it may be private or removed.");
+  const j = (await r.json()) as { title?: string; author_name?: string };
+  const channel = j.author_name ?? "YouTube";
+  return {
+    museum: "YouTube",
+    id,
+    title: j.title ?? "YouTube video",
+    artist: channel,
+    date: "",
+    medium: "Video",
+    credit: /vevo$/i.test(channel.replace(/\s/g, "")) ? "Official artist channel (VEVO)" : "Check it's an official channel",
+    url: watch,
+    publicDomain: false,
+    thumbUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    video: { id, channel },
+  };
+}

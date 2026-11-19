@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, uid, useCollection, useStatus } from "@/lib/client";
 import { pdfUrl } from "@/lib/textbooks";
-import { clearPdfError, enqueuePdf, usePdfQueue } from "@/lib/pdfQueue";
+import { clearPdfError, enqueuePdf, resumePdfs, usePdfQueue } from "@/lib/pdfQueue";
 import { STARTER_RESOURCES, findLinks } from "@/lib/starter";
 import type { Resource, ResourceKind } from "@/lib/types";
 
@@ -34,6 +34,10 @@ export default function Library() {
   const [pdfLink, setPdfLink] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pq = usePdfQueue();
+  useEffect(() => {
+    resumePdfs((id, pdf) => update((cur) => cur.map((r) => (r.id === id ? { ...r, pdf } : r))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Queue a PDF (file or link) for a resource; the panel closes straight away.
   function attachPdf(id: string, title: string, file: File | null, link: string) {
@@ -118,7 +122,7 @@ export default function Library() {
         {!formOpen && <button className="btn" onClick={() => openForm()}>+ add a resource</button>}
       </div>
       <div className="savedsum mute">
-        {pq.busy > 0 && <span className="pdfstatus saving" style={{ marginRight: 14 }}><span className="spinner tiny" aria-hidden="true" /> saving {pq.busy} PDF{pq.busy === 1 ? "" : "s"} — keep this tab open ·</span>}
+        {pq.busy > 0 && <span className="pdfstatus saving" style={{ marginRight: 14 }}><span className="spinner tiny" aria-hidden="true" /> saving {pq.busy} PDF{pq.busy === 1 ? "" : "s"} — links carry on even if you close the page ·</span>}
         {freeToSave.length > 0 && st?.pdfs !== false && (
           <><button className="linkish" onClick={saveAllFree}>save all free textbooks ({freeToSave.length})</button> · </>
         )}

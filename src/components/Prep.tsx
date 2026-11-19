@@ -652,7 +652,7 @@ export default function Prep() {
     const id = lessonId;
     const upd = (fn: (l: Lesson) => Lesson) => updateLessons((cur) => cur.map((l) => (l.id === id ? fn(l) : l)));
     recover(`research:${id}`, (d) => upd((l) => withResearch(l, d as ResearchDoc)));
-    recover(`slides:${id}`, (d) => upd((l) => withSlides(l, d as Slide[])));
+    recover(`slides:${id}`, (d) => upd((l) => withSlides(l, Array.isArray(d) ? (d as Slide[]) : (d as { slides: Slide[] }).slides)));
     recover(`review:${id}`, (d) => upd((l) => withReview(l, d as ReviewDoc)));
     recover(`chat:${id}`, (d) => upd((l) => withChat(l, undefined, d as { reply: string; sources: Source[]; ops: ChatOp[] })));
     recover(`check:${id}`, (d, m) => upd((l) => withCheck(l, d as { claims: Claim[]; at: string }, ((d as { checked?: string[] }).checked ?? (m as { ids?: string[] } | null)?.ids ?? []).filter(Boolean))));
