@@ -264,7 +264,7 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
   const [sel, setSel] = useState<string | null>(initial ?? null);
   const [more, setMore] = useState(false);
   const [focus, setFocusState] = useState(true);
-  const [tools, setTools] = useState(false); // the "add an exhibit" panel in focus view
+  const [drawer, setDrawer] = useState<"" | "exhibit" | "reuse">(""); // focus view: add an exhibit to this slide / slides from another class
   useEffect(() => setFocusState(load<boolean>("pine.focus", true)), []);
   const [menu, setMenu] = useState(false);
   useEffect(() => {
@@ -480,7 +480,6 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
                 </details>
               )}
               <div className="row">
-                <button className="btn sm ghost" onClick={() => { const c = { ...slide, id: uid(), check: undefined }; setSlides((x) => { const i = x.findIndex((y) => y.id === slide.id); const n = [...x]; n.splice(i + 1, 0, c); return n; }); setSel(c.id); }}>Duplicate</button>
                 <button className="btn sm ghost" onClick={() => { if (confirm("Delete this slide?")) { setSlides((x) => x.filter((y) => y.id !== slide.id)); setSel(null); } }}>Delete slide</button>
               </div>
             </div>
@@ -517,6 +516,7 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
                 </button>
               ))}
               <button className="railadd" onClick={() => { const n = blankSlide("text"); setSlides((x) => { const i = x.findIndex((y) => y.id === slide.id); const c = [...x]; c.splice(i + 1, 0, n); return c; }); setSel(n.id); }} title="Add a slide after this one">+ slide</button>
+              <button className="railadd" onClick={() => setDrawer(drawer === "reuse" ? "" : "reuse")} title="Copy slides from another class in after this one">+ from another class</button>
             </nav>
             <div className="pptmain">
               <div className="focusnav">
@@ -534,10 +534,35 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
                 {editorBody}
               </section>
               <div className="focustools">
-                <button className="btn" onClick={() => setTools(!tools)}>{tools ? "close" : "+ add an exhibit or slides"}</button>
+                <button className="btn" onClick={() => setDrawer(drawer === "exhibit" ? "" : "exhibit")}>{drawer === "exhibit" ? "close" : "+ add an exhibit to this slide"}</button>
                 <span className="mute">or use the chat: “simplify this slide”, “find a better picture for this”</span>
               </div>
-              {tools && <div className="focusdrawer">{toolsPanel}</div>}
+              {drawer === "exhibit" && (
+                <div className="focusdrawer stack">
+                  {chosen.length > 0 && (
+                    <>
+                      <div className="mono mute">your exhibits not yet on a slide</div>
+                      <div className="exhibits">
+                        {chosen.map((a) => (
+                          <div key={a.url} className="ex">
+                            <div className="photo">{a.thumbUrl && <img src={proxied(a.thumbUrl)} alt="" />}</div>
+                            <b>{a.title}</b>
+                            <button className="btn sm ghost" onClick={() => addArt(a)}>+ to this slide</button>
+                          </div>
+                        ))}
+                      </div>
+                      <hr className="rule" />
+                    </>
+                  )}
+                  <ExhibitsPanel q={q} setQ={setQ} onAdd={addArt} addLabel="+ to this slide" />
+                </div>
+              )}
+              {drawer === "reuse" && (
+                <div className="focusdrawer">
+                  <div className="row" style={{ justifyContent: "space-between" }}><b style={{ fontWeight: 500 }}>slides from another class</b><button className="linkish" onClick={() => setDrawer("")}>close</button></div>
+                  <ReusePanel lesson={lesson} onAdd={(add) => { setSlides((x) => { const i = x.findIndex((y) => y.id === slide.id); const c = [...x]; c.splice(i + 1, 0, ...add); return c; }); if (add[0]) setSel(add[0].id); setDrawer(""); }} />
+                </div>
+              )}
             </div>
           </div>
         )}
