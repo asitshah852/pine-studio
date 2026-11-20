@@ -1,11 +1,18 @@
 "use client";
-// The research document as a Word file she can keep and edit. Sources are numbered [1], [2]…
+// The research document as a Word file she can keep and edit.
 import type { Lesson } from "./types";
-import { caption } from "./museum";
+
+// Laid out like a magazine article (Asit, Nov 2026: "like The Economist"): a red section flag, a
+// serif headline, an opening that starts in small caps, short crossheads, indented paragraphs, and
+// small superscript source numbers that lead to a numbered source list at the end.
+const RED = "E3120B";
+const GREY = "6B6B6B";
+const SERIF = "Georgia";
+const SANS = "Helvetica";
 
 export async function downloadDocx(lesson: Lesson, course: string) {
   const d = await import("docx");
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, ExternalHyperlink } = d;
+  const { Document, Packer, Paragraph, TextRun, ExternalHyperlink, BorderStyle } = d;
   const doc = lesson.research;
   if (!doc) return;
   const num = new Map<string, number>();
@@ -17,60 +24,92 @@ export async function downloadDocx(lesson: Lesson, course: string) {
     }
     return num.get(url)!;
   };
-  const font = "Helvetica";
-  const kids = [
-    new Paragraph({ children: [new TextRun({ text: `${course} · Class ${lesson.number}`.toUpperCase(), size: 18, color: "777777", font })] }),
-    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: lesson.topic, font })] }),
-    ...(lesson.premise ? [new Paragraph({ children: [new TextRun({ text: lesson.premise, italics: true, font })] })] : []),
-    ...(doc.overview ? [new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: doc.overview, font })] })] : []),
+  const sup = (t: string) => new TextRun({ text: t, superScript: true, color: GREY, size: 17 });
+  const crosshead = (t: string) =>
+    new Paragraph({ spacing: { before: 320, after: 80 }, keepNext: true, children: [new TextRun({ text: t, bold: true, font: SERIF, size: 23 })] });
+  const kids: InstanceType<typeof Paragraph>[] = [
+    new Paragraph({
+      border: { top: { style: BorderStyle.SINGLE, size: 18, color: RED, space: 6 } },
+      spacing: { after: 160 },
+      children: [new TextRun({ text: `${course || "Art Appreciation"}  |  Class ${lesson.number}`, font: SANS, size: 17, bold: true, color: RED, smallCaps: true })],
+    }),
+    new Paragraph({ spacing: { after: 240 }, children: [new TextRun({ text: lesson.topic, font: SERIF, size: 52, bold: true })] }),
   ];
+  // The opening: first few words in small caps, the way a magazine article starts.
+  if (doc.overview) {
+    const words = doc.overview.split(" ");
+    const lead = words.slice(0, 4).join(" ");
+    kids.push(
+      new Paragraph({
+        spacing: { after: 120, line: 300 },
+        children: [new TextRun({ text: lead, smallCaps: true, font: SERIF, size: 22 }), new TextRun({ text: " " + words.slice(4).join(" "), font: SERIF, size: 22 })],
+      }),
+    );
+  }
   for (const s of doc.sections) {
-    kids.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 300 }, children: [new TextRun({ text: s.heading, font })] }));
-    for (const p of s.paragraphs) {
+    if (s.heading) kids.push(crosshead(s.heading));
+    s.paragraphs.forEach((p, i) => {
       const refs = p.sources.map((x) => ref(x.url, x.title));
       kids.push(
         new Paragraph({
-          spacing: { after: 120 },
-          children: [
-            new TextRun({ text: p.text, font }),
-            new TextRun({ text: refs.length ? ` [${refs.join(", ")}]` : " [unverified]", font, color: "777777" }),
-          ],
+          spacing: { after: 60, line: 300 },
+          indent: i > 0 ? { firstLine: 300 } : undefined,
+          children: [new TextRun({ text: p.text, font: SERIF, size: 22 }), sup(refs.length ? refs.join(",") : "?")],
         }),
       );
-    }
+    });
   }
   if (doc.questions.length) {
-    kids.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 300 }, children: [new TextRun({ text: "Discussion questions", font })] }));
-    doc.questions.forEach((q) => kids.push(new Paragraph({ bullet: { level: 0 }, children: [new TextRun({ text: q, font })] })));
+    kids.push(crosshead("For discussion"));
+    doc.questions.forEach((q, i) =>
+      kids.push(new Paragraph({ spacing: { after: 80, line: 290 }, indent: { left: 360, hanging: 360 }, children: [new TextRun({ text: `${i + 1}.\t${q}`, font: SERIF, size: 22 })] })),
+    );
   }
   const works = doc.exhibits.filter((e) => e.match);
   if (works.length) {
-    kids.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 300 }, children: [new TextRun({ text: "Exhibits", font })] }));
-    works.forEach((e) =>
+    kids.push(crosshead("Works to show"));
+    works.forEach((e) => {
+      const a = e.match!;
+      const r = ref(a.url, `${a.museum}: ${a.title}`);
       kids.push(
         new Paragraph({
-          bullet: { level: 0 },
+          spacing: { after: 100, line: 290 },
+          indent: { left: 360, hanging: 360 },
           children: [
-            new TextRun({ text: caption(e.match!), font }),
-            new TextRun({ text: e.why ? ` — ${e.why}` : "", font, color: "555555" }),
-            new TextRun({ text: ` [${ref(e.match!.url, `${e.match!.museum}: ${e.match!.title}`)}]`, font, color: "777777" }),
+            new TextRun({ text: "■\t", font: SANS, size: 14, color: RED }),
+            new TextRun({ text: a.title, italics: true, font: SERIF, size: 22 }),
+            new TextRun({ text: `, ${a.artist}${a.date ? `, ${a.date}` : ""}. ${a.museum === "YouTube" ? "Video on YouTube" : a.museum}.`, font: SERIF, size: 22 }),
+            sup(String(r)),
+            ...(e.why ? [new TextRun({ text: ` ${e.why}`, font: SERIF, size: 22, color: "444444" })] : []),
           ],
         }),
-      ),
-    );
+      );
+    });
   }
-  kids.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 300 }, children: [new TextRun({ text: "Sources", font })] }));
+  kids.push(new Paragraph({ border: { top: { style: BorderStyle.SINGLE, size: 4, color: "BBBBBB", space: 6 } }, spacing: { before: 400, after: 80 }, children: [new TextRun({ text: "Sources", font: SANS, size: 16, bold: true, smallCaps: true, color: GREY })] }));
   list.forEach((s, i) =>
     kids.push(
       new Paragraph({
+        spacing: { after: 30 },
+        indent: { left: 300, hanging: 300 },
         children: [
-          new TextRun({ text: `[${i + 1}] ${s.title} — `, font, size: 18 }),
-          new ExternalHyperlink({ link: s.url, children: [new TextRun({ text: s.url, style: "Hyperlink", font, size: 18 })] }),
+          new TextRun({ text: `${i + 1}\t${s.title}. `, font: SANS, size: 15, color: GREY }),
+          new ExternalHyperlink({ link: s.url.startsWith("/") ? `${location.origin}${s.url}` : s.url, children: [new TextRun({ text: s.url.replace(/^https?:\/\//, "").slice(0, 90), style: "Hyperlink", font: SANS, size: 15 })] }),
         ],
       }),
     ),
   );
-  const blob = await Packer.toBlob(new Document({ creator: "pine studio", title: lesson.topic, sections: [{ children: kids }] }));
+  if (doc.sections.some((x) => x.paragraphs.some((p) => !p.sources.length)))
+    kids.push(new Paragraph({ spacing: { before: 60 }, children: [new TextRun({ text: "? — not yet confirmed by a source; check before teaching.", font: SANS, size: 15, color: GREY })] }));
+
+  const blob = await Packer.toBlob(
+    new Document({
+      creator: "pine studio",
+      title: lesson.topic,
+      styles: { default: { document: { run: { font: SERIF, size: 22 } } } },
+      sections: [{ properties: { page: { margin: { top: 1300, bottom: 1300, left: 1500, right: 1500 } } }, children: kids }],
+    }),
+  );
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `Class ${String(lesson.number).padStart(2, "0")} - ${lesson.topic}`.replace(/[^\w\s-]/g, "").slice(0, 80) + ".docx";

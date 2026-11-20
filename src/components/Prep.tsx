@@ -7,7 +7,7 @@ import { load, proxied, save, uid, useCollection, useStatus } from "@/lib/client
 import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
 import { recover, runJob, useJob } from "@/lib/jobs";
-import { makeClass, runCheck, runResearch, runSlides, slideCount } from "@/lib/make";
+import { makeClass, runCheck, runResearch, runRestyle, runSlides, slideCount } from "@/lib/make";
 import { oneGate, stopMaking, Stopped } from "@/lib/makeQueue";
 import { applyFix, confirmClaim, restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
 import { caption } from "@/lib/museum";
@@ -125,8 +125,15 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
   const doc = lesson.research;
   const setDoc = (fn: (d: ResearchDoc) => ResearchDoc) => set((l) => (l.research ? { ...l, research: fn(l.research) } : l));
 
+  const [mode, setMode] = useState<"research" | "restyle">("research");
+  async function polish() {
+    job.clearError();
+    setMode("restyle");
+    await job.run(() => runRestyle(lesson, course, set));
+  }
   async function run() {
     if (doc && !confirm("Replace the current research document with a new one?")) return;
+    setMode("research");
     job.clearError();
     await job.run(async () => {
       await runResearch(lesson, course, set);
@@ -164,11 +171,14 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
           <div className="row">
             <Versions lesson={lesson} kind="research" set={set} />
             <button className="btn sm ghost" onClick={() => downloadDocx(lesson, course)}>Word ↓</button>
-            <button className="btn sm ghost" disabled={busy} onClick={run}>{busy ? "researching…" : "redo"}</button>
+            <button className="btn sm ghost" disabled={busy || st?.claude === false} onClick={polish} title="Rewrites the wording in a clear magazine style (like The Economist). Facts, quotes and sources stay exactly as they are; the old version is kept.">rewrite in house style</button>
+            <button className="btn sm ghost" disabled={busy} onClick={run}>{busy ? "working…" : "redo"}</button>
             <button className="btn sm ghost" onClick={() => confirm("Delete this research document? (You can restore it from earlier versions.)") && set((l) => withResearch(l, undefined))}>Delete</button>
           </div>
         </div>
-        {busy && <Working since={job.started} what="Researching again" doing="Searching museum, Smarthistory and scholarly pages, writing a new document, then matching exhibits" usual="2–3 minutes" />}
+        {busy && (mode === "restyle"
+          ? <Working since={job.started} what="Rewriting in house style" doing="Tightening the wording like a magazine editor; every fact, quote and source stays as it is" usual="about a minute" />
+          : <Working since={job.started} what="Researching again" doing="Searching museum, Smarthistory and scholarly pages, writing a new document, then matching exhibits" usual="2–3 minutes" />)}
         {err && <div className="err">{err}</div>}
         <textarea className="area plain lead" value={doc.overview} onChange={(e) => setDoc((d) => ({ ...d, overview: e.target.value }))} rows={3} />
         {doc.sections.map((s) => (

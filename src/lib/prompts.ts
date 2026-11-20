@@ -15,6 +15,70 @@ Rules you never break:
 
 export type Excerpt = { book: string; path: string; page: number; text: string; url: string };
 
+/** House prose style for the research document (Asit, Nov 2026: "write like The Economist"). */
+export const PROSE = `Write like The Economist: clear, confident, lively prose for intelligent readers (here, 19–20-year-old students and their professor).
+- Plain words, short sentences, active voice. One idea per paragraph; vary the rhythm.
+- Open each section with its most interesting point, not with background. Let the paragraphs tell a story, with a light, dry wit — never jokey, gushing or breathless.
+- No filler or hype: never "delve", "landscape", "pivotal", "iconic", "game-changer", "tapestry", "it's worth noting", "in conclusion". No lists dressed up as sentences.
+- Headings are short, crisp crossheads of two to five words, with no colons, dates or quotation marks.
+- American spelling. Spell out one to nine; use figures for 10 and up.
+- Explain any term a first-year student may not know in a few words, inline.`;
+
+/** A rewrite may change wording only: no number, quotation or name that wasn't in the original. Pure — tested. */
+export function keepsFacts(before: string, after: string): boolean {
+  const nums = (t: string) => new Set((t.replace(/(\d),(\d{3})/g, "$1$2").match(/\d+(?:\.\d+)?/g) ?? []));
+  const a = nums(before);
+  for (const n of nums(after)) if (!a.has(n)) return false;
+  const quotes = (t: string) => [...t.matchAll(/[“"]([^”"]{3,})[”"]/g)].map((m) => m[1].trim());
+  const plain = before.replace(/[“”]/g, '"');
+  for (const q of quotes(after)) if (!plain.includes(q.replace(/[“”]/g, '"'))) return false;
+  // Capitalised words mid-sentence are names, places and titles: they must already be there.
+  const words = new Set(before.match(/[A-Z][\w'’-]+/g) ?? []);
+  for (const m of after.matchAll(/(?<![.!?:]\s|^|[“"(]\s?)\b([A-Z][\w'’-]+)/g)) if (!words.has(m[1]) && !/^(I|A|An|The|In|On|At|But|And|So|Its|It|This|That|They|He|She|We|You|Before|After|When|While|For|With|By|Why|What|How|Who)$/.test(m[1])) return false;
+  return true;
+}
+
+/** Rewrite the research document in the house prose style, keeping every fact and source. */
+export async function restyle(doc: ResearchDoc, topic: string, course: string): Promise<ResearchDoc> {
+  const body = doc.sections.map((s) => `## [sec:${s.id}] ${s.heading}\n${s.paragraphs.map((p) => `[p:${p.id}] ${p.text}`).join("\n")}`).join("\n\n");
+  const { text } = await ask({
+    system: `You are an editor at The Economist, editing a teaching document for an undergraduate class. ${PROSE}
+Rules you never break: keep every fact exactly — names, dates, numbers, places, titles and quotations stay word for word; add no new fact; drop nothing that is sourced. Change only the wording, order of sentences within a paragraph, and the headings.`,
+    effort: "medium",
+    content: [
+      {
+        type: "text",
+        text: `Class: "${topic}" (${course || "Art Appreciation"}).
+
+OPENING:
+${doc.overview}
+
+DOCUMENT (keep the ids):
+${body}
+
+Return ONLY JSON (in a \`\`\`json block): { "overview": "the opening, rewritten (2–3 sentences that make a student want to read on; no facts that need a source)", "sections": [ { "id": "section id", "heading": "new crosshead", "paragraphs": [ { "id": "paragraph id", "text": "rewritten paragraph" } ] } ] }`,
+      },
+    ],
+  });
+  const out = parseJson<{ overview?: string; sections?: { id?: string; heading?: string; paragraphs?: { id?: string; text?: string }[] }[] }>(text);
+  const secs = new Map((out.sections ?? []).map((x) => [x.id, x]));
+  const paras = new Map((out.sections ?? []).flatMap((x) => x.paragraphs ?? []).map((p) => [p.id, p.text]));
+  return {
+    ...doc,
+    at: new Date().toISOString(),
+    overview: out.overview?.trim() || doc.overview,
+    sections: doc.sections.map((s) => ({
+      ...s,
+      heading: secs.get(s.id)?.heading?.trim() || s.heading,
+      // a rewrite that changed a fact is ignored: that paragraph keeps its original wording
+      paragraphs: s.paragraphs.map((p) => {
+        const t = paras.get(p.id)?.trim();
+        return t && keepsFacts(p.text, t) ? { ...p, text: t } : p;
+      }),
+    })),
+  };
+}
+
 export async function research(
   topic: string,
   premise: string,
@@ -32,7 +96,7 @@ export async function research(
     ? `\n\nHER COURSE TEXTBOOKS — pages from her own stored copies that match this topic. Use them where relevant (students have these books), alongside the web. To cite one, put { "textbook": N } in that paragraph's sources.\n${pages.map((p, i) => `[textbook ${i + 1}] ${p.book}, PDF page ${p.page}:\n${p.text}`).join("\n\n")}`
     : "";
   const { text, retrieved } = await ask({
-    system: HOUSE,
+    system: `${HOUSE}\n\n${PROSE}`,
     search: 12,
     effort: "medium",
     content: [
@@ -41,12 +105,12 @@ export async function research(
         text: `Write the research document for a class in "${course || "Art Appreciation"}".
 Topic: "${topic}".${premise ? `\nHer premise / angle: ${premise}` : ""}${minutes ? `\nThe class is ${minutes} minutes long.` : ""}
 
-The document is 1–2 pages (about 700–1,000 words) that she can teach from and keep: clear sections, plain language, every factual sentence sourced.${textbook}${clipped}${trusted}
+The document is 1–2 pages (about 700–1,000 words) that she can teach from and keep, written in the house style above, every factual sentence sourced.${textbook}${clipped}${trusted}
 
 Return ONLY a JSON object (in a \`\`\`json block):
 {
-  "overview": "2–3 sentence framing of the class for students (no facts that need a source)",
-  "sections": [ { "heading": "section heading", "paragraphs": [ { "text": "2–4 sentences of sourced fact", "sources": [ { "title": "page title", "url": "exact URL you retrieved" } or { "textbook": N } ] } ] } ],   // 4–6 sections, 1–3 paragraphs each
+  "overview": "a 2–3 sentence opening that makes a student want to read on (no facts that need a source)",
+  "sections": [ { "heading": "short crosshead, two to five words", "paragraphs": [ { "text": "2–4 sentences of sourced fact", "sources": [ { "title": "page title", "url": "exact URL you retrieved" } or { "textbook": N } ] } ] } ],   // 4–6 sections, 1–3 paragraphs each
   "questions": [ "open discussion question" ],   // 4–6, no facts needed
   "exhibits": [ { "type": "artwork | photograph | video", "artist": "artist name (for a video: the artist or channel)", "title": "exact title of the work or video", "date": "date", "why": "one sentence on why it fits this class" } ]   // 6–10 things to show; for art prefer works in the Art Institute of Chicago, The Met or the Cleveland Museum of Art and use the museum's own title; historic photographs can come from the Library of Congress; for music, film or performance topics include official videos (they are looked up on YouTube)
 }`,

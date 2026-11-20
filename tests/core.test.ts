@@ -274,3 +274,13 @@ test("older slides: picture-slide talking points move off the slide; text slides
   assert.equal(b.body, "- One\n- Two"); assert.equal(b.v, 2);
   assert.deepEqual(upgrade({ ...l, slides: [a, b] }).slides, [a, b]);
 });
+
+test("house-style rewrite: wording may change, facts may not", async () => {
+  const { keepsFacts } = await import("../src/lib/prompts");
+  const before = 'At 12:01 a.m. on August 1, 1981, MTV went on the air with "Video Killed the Radio Star" by the Buggles.';
+  assert.ok(keepsFacts(before, 'MTV went on the air at 12:01 a.m. on August 1, 1981. Its first video was "Video Killed the Radio Star" by the Buggles.'));
+  assert.ok(!keepsFacts(before, "MTV went on the air on August 2, 1981 with the Buggles."), "a changed date is caught");
+  assert.ok(!keepsFacts(before, 'MTV launched on August 1, 1981 with "Video Killed the Radio Stars" by the Buggles.'), "a changed quote is caught");
+  assert.ok(!keepsFacts(before, "MTV went on the air on August 1, 1981, a project of Robert Pittman, with the Buggles."), "a new name is caught");
+  assert.ok(keepsFacts("Over 2,000 episodes aired.", "More than 2000 episodes aired."));
+});

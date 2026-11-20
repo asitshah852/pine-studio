@@ -87,3 +87,13 @@ export async function runQuiz(l: Lesson, course: string, set: Set, count = 5): P
   forget(key);
   return quiz;
 }
+
+/** Rewrite the research document in the house style (wording only; facts and sources stay). The
+ *  old one is kept under earlier versions. Shares the research job key, so a closed page picks it up. */
+export async function runRestyle(l: Lesson, course: string, set: Set): Promise<void> {
+  if (!l.research) return;
+  const key = `research:${l.id}`;
+  const r = await apiJob<ResearchDoc>("/api/restyle", { doc: l.research, topic: l.topic, course, jobKey: key });
+  set((x) => withResearch(x, r));
+  forget(key);
+}

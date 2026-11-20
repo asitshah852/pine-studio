@@ -5,7 +5,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { MODEL, claudeOn, getClient, groundSources, NoClaude, normUrl } from "./claude";
 import { caption } from "./museum";
 import { searchSources } from "./search";
-import { HOUSE } from "./prompts";
+import { HOUSE, PROSE } from "./prompts";
 import type { Artwork, ChatOp, Lesson, Source } from "./types";
 
 type B = Anthropic.Beta.Messages.BetaToolUnion;
@@ -48,7 +48,7 @@ You are now talking with Tanya inside her prep tool about one class. Be a warm, 
 - If YouTube search is switched off, ask her to paste the video's YouTube link; find_exhibits with that link as the query works without the key.
 - Exhibits only come from find_exhibits (real museum, Library of Congress or YouTube records). Never invent a work, record or video. For YouTube, prefer official artist, label or museum channels and say which channel it is.
 - Each slide has two kinds of text. Slide text = what students see (short; bullets on text slides; usually nothing on picture slides besides the caption). Talking points = what she says while it's up, never shown: a segue from the slide before, the context students need, a question to put to the room, how it connects to the next idea; on exhibit slides, what to point out in the work. Write talking points as 2–5 short lines in her spoken voice.
-- Refer to slides by their number, not their id.
+- Research paragraphs you write or rewrite follow the house prose style:\n${PROSE}\n- Refer to slides by their number, not their id.
 - She can run the whole deck through you. "Finish up" / "wrap it up" / "I'm done" → finish_class (unconfirmed facts don't stop it). "Check it" → fact_check_slides. "Show me slide N" → show_slide. "Start the slides over" → remake_slides. Long jobs run after your reply; say they've started.`;
 
 function snapshot(l: Lesson, course: string): string {
