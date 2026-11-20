@@ -12,8 +12,8 @@ function next(l: Lesson): { label: string; href: string } {
   if (l.status === "ready") return { label: "open it", href: `/classes?open=${l.id}` };
   if (!l.research && !l.slides.length) return { label: "make my class", href: `/prep?lesson=${l.id}&make=1` };
   if (!l.slides.length) return { label: "make the slides", href: `/prep?lesson=${l.id}&step=3` };
-  if (r.problems || r.unchecked) return { label: r.problems ? `fix ${r.problems} slide(s)` : "finish checking", href: `/prep?lesson=${l.id}&step=4` };
-  return { label: "mark it ready for class", href: `/prep?lesson=${l.id}&step=4` };
+  if (r.problems) return { label: `look at ${r.problems} slide${r.problems === 1 ? "" : "s"}`, href: `/prep?lesson=${l.id}&step=3` };
+  return { label: "finish the slides", href: `/prep?lesson=${l.id}&step=3` };
 }
 
 /** Where a class stands, in a few words. */
@@ -54,7 +54,7 @@ export default function Home() {
             <p className="mute" style={{ margin: "0 0 18px" }}>{makeJob.running ? `being made now — ${makeJob.stage || "starting"}…` : where(top)}</p>
             <div className="row">
               {!makeJob.running && <Link className="btn solid" href={n!.href}>{n!.label} →</Link>}
-              <Link className="linkish" href={`/prep?lesson=${top.id}`}>open in prep</Link>
+              <Link className="linkish" href={`/prep?lesson=${top.id}`}>open</Link>
             </div>
           </div>
           {top.slides[0] && <div className="nextup-slide"><SlideView s={top.slides[0]} n={top.number} /></div>}

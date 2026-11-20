@@ -8,6 +8,14 @@
   Her change requests arrive through the Feedback tab.
 
 ## The project
+- **Simplified (Asit, Nov 2026 — supersedes older notes below where they differ):**
+  1. One place per class. A class still being made opens in its workspace (route /prep?lesson=<id>, but "Prep" is no longer in the menu); a finished class opens on its quiet class page (/classes?open=<id>, "edit" goes back to the workspace). Classes rows, Home and ?open= links route by status; the menu counts the workspace as "classes" and greys its course.
+  2. The workspace has two tabs, **notes** (research) and **slides**. Title and summary are edited in place at the top (Inline), class length is a small dropdown there, and **ready for class →** (top right, and after the last slide) marks it ready and opens the class page. The old Brief step is only the "New class" form; the old "check & finish" step is gone — the fact-check runs on its own and a line by the tabs says "✓ fact-checked" or "✗ n slides to look at" (click = first one). Quiz and downloads live on the class page.
+  3. Menu: home · classes (courses under it) · library, plus "more" (checker, feedback, clip button), and search.
+  4. Plain words: "notes" (not research document), "pictures & videos" (not exhibits), "tidy the writing" (not house style), "write new notes", "make the slides".
+  5. The chat does most things; rarely used buttons sit behind "more" (notes: Word ↓ + more → tidy the writing / write new notes / earlier versions / delete; slides: "+ more" above the slides → make/remake, how many slides, + blank slide, versions, show all slides). "Suggest improvements" in notes is folded unless a review is open.
+  6. Library: two sections, "your books" (saved PDFs) and "free books and places to look"; no intro text, section notes, usage labels or "show only saved".
+  7. Empty states say one thing to do ("No notes yet… write the notes", "No slides yet…", "No classes yet — add one, or plan the whole semester").
 - Name: **pine studio** (always lower case). Repo `asitshah852/pine-studio`, separate from other projects.
 - Tabs (Asit, Nov 2026): Classes (by course) · Prep (1 Brief → 2 Research doc + questions + exhibits → 3 auto slides with one talking-points box per slide → 4 Check & finish) · Library · Checker · Feedback. See README.md.
 - Prep brief is just course, class number, topic and premise (no dates/units).

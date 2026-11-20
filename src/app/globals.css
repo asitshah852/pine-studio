@@ -710,3 +710,22 @@ body.slidesfocus .page { max-width: none; padding-left: 28px; }
 .foldlist a:hover { text-decoration: underline; }
 .stepnav[hidden] { display: none; }
 .err-inline { color: var(--safelight); }
+/* menu: "more" folds the less-used pages */
+.navmore { margin: 14px 0 0; }
+.navmore summary { cursor: pointer; list-style: none; color: var(--mute); }
+.navmore summary::-webkit-details-marker { display: none; }
+.navmore summary::after { content: " +"; }
+.navmore[open] summary::after { content: " −"; }
+.navmore a { display: block; margin: 8px 0 0 10px; font-size: 17px; text-decoration: none; color: var(--ink); }
+.navmore a[aria-current="page"] { color: var(--mute); }
+/* small fold-out menus ("more") */
+.minimenu { position: relative; }
+.minimenu summary { list-style: none; cursor: pointer; }
+.minimenu summary::-webkit-details-marker { display: none; }
+.minimenu-body { position: absolute; right: 0; top: 130%; z-index: 20; background: var(--bg); border: 1px solid var(--line); padding: 10px 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 200px; white-space: nowrap; }
+.inlineselect { border: 0; border-bottom: 1px dotted var(--line); background: none; font: inherit; color: inherit; padding: 0 2px; cursor: pointer; appearance: none; -webkit-appearance: none; width: auto; }
+.quietlink { color: inherit; text-decoration: none; }
+.quietlink:hover { text-decoration: underline; }
+.checkline { margin-left: auto; align-self: center; font-size: 17px; }
+.checkline .bad, .v.bad { color: var(--safelight); }
+.slidemore > summary { font-size: 17px; color: var(--mute); }

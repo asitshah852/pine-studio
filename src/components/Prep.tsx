@@ -11,15 +11,14 @@ import { makeClass, runCheck, runResearch, runRestyle, runSlides, slideCount } f
 import { oneGate, stopMaking, Stopped } from "@/lib/makeQueue";
 import { applyFix, confirmClaim, restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
 import { caption } from "@/lib/museum";
-import { downloadPptx } from "@/lib/pptx";
-import { addTo, blankSlide, checkItems, readiness, slideFrom, slideState } from "@/lib/slides";
+import { addTo, blankSlide, readiness, slideFrom, slideState } from "@/lib/slides";
 import { STARTER_RESOURCES } from "@/lib/starter";
 import { OTHER, pad, useStudio } from "@/lib/studio";
 import type { Artwork, ChatOp, Claim, Lesson, ResearchDoc, Resource, ReviewDoc, Slide, Source } from "@/lib/types";
 import Claims from "./Claims";
 import Improve, { importAll, UploadButton } from "./Improve";
 import Working from "./Working";
-import QuizBox from "./QuizBox";
+import Inline from "./Inline";
 import Versions from "./Versions";
 import Talk from "./Talk";
 import { ExhibitsPanel, FilesPanel, LibraryPanel, ReusePanel, TextbookPanel } from "./Panels";
@@ -95,19 +94,19 @@ function Brief({ lesson, preset, onSave, onMake }: { lesson: Lesson | null; pres
       {courseId === "new" && (
         <div><label className="label mono">New course name</label><input className="input" autoFocus value={newCourse} onChange={(e) => setNewCourse(e.target.value)} placeholder="e.g. Art Appreciation 103" /></div>
       )}
-      <div><label className="label mono">Topic</label><input className="input" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Impressionism and the camera" /></div>
+      <div><label className="label mono">Title</label><input className="input" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Impressionism and the camera" /></div>
       <div>
-        <label className="label mono">Premise — what is this class about?</label>
+        <label className="label mono">What is it about? (optional)</label>
         <textarea className="area" value={premise} onChange={(e) => setPremise(e.target.value)} placeholder="e.g. How photography changed what painters thought painting was for. Link to works students can see at the Art Institute." />
       </div>
       <div className="row">
-        <button type="button" className="btn solid" disabled={!ok || st?.claude === false} onClick={() => ok && onMake(data())} title="Research, slides with exhibits, and fact-check — in one go">
+        <button type="button" className="btn solid" disabled={!ok || st?.claude === false} onClick={() => ok && onMake(data())} title="Notes, slides with pictures and videos, and a fact-check — in one go">
           make my class
         </button>
-        <button className="btn">{lesson ? "save — I'll go step by step" : "step by step"}</button>
+        <button className="btn">just create it</button>
       </div>
       <p className="mute" style={{ margin: 0, fontSize: 16 }}>
-        <b>make my class</b> does it all in one go (about 5–8 minutes): research, slides with the best exhibits, then a fact-check. You can work elsewhere meanwhile and change anything afterwards.
+        <b>make my class</b> does it all in one go (about 5–8 minutes): notes, slides with pictures and videos, then a fact-check. You can work elsewhere meanwhile.
       </p>
     </form>
   );
@@ -132,7 +131,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
     await job.run(() => runRestyle(lesson, course, set));
   }
   async function run() {
-    if (doc && !confirm("Replace the current research document with a new one?")) return;
+    if (doc && !confirm("Write new notes? (The current ones are kept under earlier versions.)")) return;
     setMode("research");
     job.clearError();
     await job.run(async () => {
@@ -142,19 +141,14 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
 
   if (!doc)
     return (
-      <div className="card stack" style={{ maxWidth: 720 }}>
-        <h2>Research</h2>
-        <p style={{ margin: 0 }}>
-          Writes a 1–2 page document on <b>{lesson.topic}</b> from your stored textbooks (cited by page) and museum, Smarthistory and scholarly pages, with discussion questions and
-          suggested exhibits looked up in the Art Institute, the Met and Cleveland. Every fact keeps its source; anything unsourced is marked “?”.
-        </p>
-        {lesson.premise && <p className="mute" style={{ margin: 0 }}>Premise: {lesson.premise}</p>}
+      <div className="stack" style={{ maxWidth: 720 }}>
+        <p style={{ margin: 0 }}>No notes yet. pine studio writes 1–2 pages from your textbooks and trusted museum and scholarly pages, with a source for every fact, discussion questions, and pictures and videos to show.</p>
         <div className="row">
-          <button className="btn solid" disabled={busy || st?.claude === false} onClick={run}>{busy ? "researching…" : "research this class"}</button>
-          <button className="btn ghost" onClick={onNext}>Skip — make slides by hand</button>
+          <button className="btn solid" disabled={busy || st?.claude === false} onClick={run}>{busy ? "writing…" : "write the notes"}</button>
+          <button className="linkish" onClick={onNext}>skip — I’ll make slides by hand</button>
           <Versions lesson={lesson} kind="research" set={set} />
         </div>
-        {busy && <Working since={job.started} what="Researching" doing="Reading the matching pages of your stored textbooks, searching museum, Smarthistory and scholarly pages, writing the document, then matching exhibits" usual="2–3 minutes" />}
+        {busy && <Working since={job.started} what="Writing the notes" doing="Reading the matching pages of your textbooks, searching museum, Smarthistory and scholarly pages, writing, then finding pictures and videos" usual="2–3 minutes" />}
         {st?.claude === false && <div className="note">Research is off until the Claude key is added in Vercel.</div>}
         {err && <div className="err">{err}</div>}
       </div>
@@ -167,18 +161,23 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
     <div className="bench">
       <article className="card doc">
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-          <span className="mono mute">Research document · {doc.at.slice(0, 10)}{unsourced ? ` · ${unsourced} paragraph(s) to check` : " · all sourced"}</span>
+          <span className="mono mute">{unsourced ? `${unsourced} paragraph${unsourced === 1 ? "" : "s"} without a source yet` : "every paragraph has a source"}</span>
           <div className="row">
-            <Versions lesson={lesson} kind="research" set={set} />
             <button className="btn sm ghost" onClick={() => downloadDocx(lesson, course)}>Word ↓</button>
-            <button className="btn sm ghost" disabled={busy || st?.claude === false} onClick={polish} title="Rewrites the wording in a clear magazine style (like The Economist). Facts, quotes and sources stay exactly as they are; the old version is kept.">rewrite in house style</button>
-            <button className="btn sm ghost" disabled={busy} onClick={run}>{busy ? "working…" : "redo"}</button>
-            <button className="btn sm ghost" onClick={() => confirm("Delete this research document? (You can restore it from earlier versions.)") && set((l) => withResearch(l, undefined))}>Delete</button>
+            <details className="minimenu">
+              <summary className="linkish">more</summary>
+              <div className="minimenu-body">
+                <button className="linkish" disabled={busy || st?.claude === false} onClick={polish} title="Clearer, livelier wording, like a good magazine. Facts, quotes and sources stay exactly as they are; the old version is kept.">tidy the writing</button>
+                <button className="linkish" disabled={busy} onClick={run}>write new notes</button>
+                <Versions lesson={lesson} kind="research" set={set} />
+                <button className="linkish" onClick={() => confirm("Delete these notes? (You can get them back from earlier versions.)") && set((l) => withResearch(l, undefined))}>delete the notes</button>
+              </div>
+            </details>
           </div>
         </div>
         {busy && (mode === "restyle"
-          ? <Working since={job.started} what="Rewriting in house style" doing="Tightening the wording like a magazine editor; every fact, quote and source stays as it is" usual="about a minute" />
-          : <Working since={job.started} what="Researching again" doing="Searching museum, Smarthistory and scholarly pages, writing a new document, then matching exhibits" usual="2–3 minutes" />)}
+          ? <Working since={job.started} what="Tidying the writing" doing="Tightening the wording like a magazine editor; every fact, quote and source stays as it is" usual="about a minute" />
+          : <Working since={job.started} what="Writing new notes" doing="Searching museum, Smarthistory and scholarly pages, writing the notes, then finding pictures and videos" usual="2–3 minutes" />)}
         {err && <div className="err">{err}</div>}
         <textarea className="area plain lead" value={doc.overview} onChange={(e) => setDoc((d) => ({ ...d, overview: e.target.value }))} rows={3} />
         {doc.sections.map((s) => (
@@ -221,7 +220,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
 
       <aside className="stack">
         <div className="card">
-          <h2 style={{ marginBottom: 4 }}>Exhibits</h2>
+          <h2 style={{ marginBottom: 4 }}>Pictures & videos</h2>
           <p className="mute" style={{ margin: "0 0 12px", fontSize: 16 }}>Suggested for this class and matched to the museum’s own record. Tick the ones to use in the slides.</p>
           <div className="stack">
             {doc.exhibits.map((e) => (
@@ -254,14 +253,14 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
           </div>
         </div>
         <div className="card">
-          <h3 className="mono" style={{ fontWeight: 400 }}>Find more exhibits</h3>
+          <h3 className="mono" style={{ fontWeight: 400 }}>Find more pictures & videos</h3>
           <ExhibitsPanel q={q} setQ={setQ} addLabel="+ Use"
             onAdd={(a: Artwork) => setDoc((d) => (d.exhibits.some((x) => x.match?.url === a.url) ? d : { ...d, exhibits: [...d.exhibits, { id: uid(), suggested: a.title, why: "", match: a, use: true }] }))} />
         </div>
       </aside>
 
       <div className="nextbar">
-        <span className="mute">{chosen} exhibit(s) chosen · {doc.questions.length} questions</span>
+        <span className="mute">{chosen} picture{chosen === 1 ? "" : "s"} & video{chosen === 1 ? "" : "s"} chosen · {doc.questions.length} questions</span>
       </div>
     </div>
   );
@@ -388,22 +387,21 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
             {[8, 12, 16, 20].map((n) => <option key={n} value={n}>about {n} slides</option>)}
           </select>
           <button className={`btn ${lesson.slides.length ? "ghost" : "solid"}`} disabled={busy || st?.claude === false} onClick={auto}>
-            {busy ? "making slides…" : lesson.slides.length ? "remake from research" : "make slides from research"}
+            {busy ? "making slides…" : lesson.slides.length ? "remake all slides from the notes" : "make the slides"}
           </button>
         </>
-      ) : <span className="mute" style={{ fontSize: 16 }}>No research yet — build slides by hand, or do Step 2 first.</span>}
-      <button className="btn ghost" onClick={() => { const s = blankSlide("text"); setSlides((x) => [...x, s]); setSel(s.id); }}>+ Blank slide</button>
+      ) : <span className="mute" style={{ fontSize: 16 }}>No notes yet — write them first, or start with a blank slide.</span>}
+      <button className="btn ghost" onClick={() => { const s = blankSlide("text"); setSlides((x) => [...x, s]); setSel(s.id); }}>+ blank slide</button>
       <Versions lesson={lesson} kind="slides" set={set} />
     </div>
   );
 
   if (!lesson.slides.length)
     return (
-      <div className="card stack" style={{ maxWidth: 720 }}>
-        <h2>Slides</h2>
-        <p style={{ margin: 0 }}>Turns the research document into a deck: slide titles, short talking points on each slide, plain-language speaker notes underneath, and your {chosen.length} chosen exhibit(s) placed where they fit. Nothing is added that isn’t in the document.</p>
+      <div className="stack" style={{ maxWidth: 720 }}>
+        <p style={{ margin: 0 }}>No slides yet.{lesson.research ? " Make them from your notes — nothing is added that isn’t in the notes." : ""}</p>
         {maker}
-        {busy && <Working since={job.started} what="Making slides" doing="Turning the research document into slides with talking points, speaker notes and your exhibits" usual="1–2 minutes" />}
+        {busy && <Working since={job.started} what="Making slides" doing="Turning your notes into slides with talking points and your pictures" usual="1–2 minutes" />}
         {err && <div className="err">{err}</div>}
       </div>
     );
@@ -412,7 +410,7 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
     <>
           <div className="dtabs" role="tablist">
             {(more ? (["exhibits", "reuse", "textbook", "images", "library"] as const) : (["exhibits", "reuse"] as const)).map((t) => (
-              <button key={t} role="tab" className="dtab mono" aria-selected={tool === t} onClick={() => setTool(t)}>{t === "images" ? "my images" : t === "reuse" ? "from another class" : t}</button>
+              <button key={t} role="tab" className="dtab mono" aria-selected={tool === t} onClick={() => setTool(t)}>{t === "images" ? "my images" : t === "reuse" ? "from another class" : t === "exhibits" ? "pictures & videos" : t}</button>
             ))}
             {!more && <button className="dtab mono" onClick={() => setMore(true)} title="textbook pages, your own images, library">+ more</button>}
           </div>
@@ -420,7 +418,7 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
             <div className={tool === "exhibits" ? "stack" : "hide"}>
               {chosen.length > 0 && (
                 <>
-                  <div className="mono mute">Your exhibits — drag onto a slide or click +</div>
+                  <div className="mono mute">Your pictures & videos — drag onto a slide or click +</div>
                   <div className="exhibits">
                     {chosen.map((a) => (
                       <div key={a.url} className="ex grab" draggable onDragStart={(e) => startDrag(e, { kind: "artwork", artwork: a })}>
@@ -499,12 +497,15 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
   if (focus)
     return (
       <>
-        <div className="row" style={{ justifyContent: "space-between", marginBottom: 14 }}>
-          {maker}
-          <button className="btn ghost" onClick={() => setFocus(false)}>show all slides</button>
-        </div>
+        <details className="fold slidemore" style={{ marginTop: 0, marginBottom: 12 }}>
+          <summary>more</summary>
+          <div className="row" style={{ marginTop: 10, flexWrap: "wrap" }}>
+            {maker}
+            <button className="btn ghost" onClick={() => setFocus(false)}>show all slides</button>
+          </div>
+        </details>
         {checkJob.error && <div className="err" style={{ marginBottom: 12 }}>Fact-check: {checkJob.error}</div>}
-        {busy && <Working since={job.started} what="Remaking slides" doing="Turning the research document into slides with talking points and your exhibits" usual="1–2 minutes" />}
+        {busy && <Working since={job.started} what="Remaking slides" doing="Turning your notes into slides with talking points and your pictures" usual="1–2 minutes" />}
         {err && <div className="err" style={{ marginBottom: 12 }}>{err}</div>}
         {slide && (
           <div className="pptwrap">
@@ -534,23 +535,23 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
                 <button className="btn" disabled={idx <= 0} onClick={() => go(-1)} aria-label="Previous slide">‹</button>
                 <span>slide {idx + 1} of {lesson.slides.length}</span>
                 <button className="btn" disabled={idx >= lesson.slides.length - 1} onClick={() => go(1)} aria-label="Next slide">›</button>
-                <span className={`v ${stateMark[slideState(slide)]}`}>{checkJob.running && !slide.check ? "checking…" : stateText[slideState(slide)]}</span>
-                <select className="select" style={{ width: "auto" }} value={slide.layout} onChange={(e) => edit({ layout: e.target.value as Slide["layout"] })} aria-label="Layout">
-                  <option value="title">title</option><option value="text">text</option><option value="artwork">one work</option><option value="compare">compare two</option>
+                {slideState(slide) === "problem" && <span className="v bad">✗ a fact to look at — see below</span>}
+                <select className="inlineselect" value={slide.layout} onChange={(e) => edit({ layout: e.target.value as Slide["layout"] })} aria-label="Slide layout" title="Slide layout">
+                  <option value="title">title slide</option><option value="text">text slide</option><option value="artwork">one picture</option><option value="compare">two pictures side by side</option>
                 </select>
               </div>
               <section className={`focusstage ${over === "stage" ? "over" : ""}`} {...stageDrop}>
                 {editorBody}
               </section>
               <div className="focustools">
-                <button className="btn" onClick={() => setDrawer(drawer === "exhibit" ? "" : "exhibit")}>{drawer === "exhibit" ? "close" : "+ add an exhibit to this slide"}</button>
+                <button className="btn" onClick={() => setDrawer(drawer === "exhibit" ? "" : "exhibit")}>{drawer === "exhibit" ? "close" : "+ add a picture or video to this slide"}</button>
                 <span className="mute">or use the chat: “simplify this slide”, “find a better picture for this”</span>
               </div>
               {drawer === "exhibit" && (
                 <div className="focusdrawer stack">
                   {chosen.length > 0 && (
                     <>
-                      <div className="mono mute">your exhibits not yet on a slide</div>
+                      <div className="mono mute">your pictures & videos not yet on a slide</div>
                       <div className="exhibits">
                         {chosen.map((a) => (
                           <div key={a.url} className="ex">
@@ -574,7 +575,7 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
               )}
               <div className="stepnav slidenav">
                 {idx > 0 ? <button className="btn" onClick={() => go(-1)}>← previous slide</button> : <button className="btn" onClick={() => onStep(2)}>← back: research &amp; ideas</button>}
-                {idx < lesson.slides.length - 1 ? <button className="btn solid" onClick={() => go(1)}>next slide →</button> : <button className="btn solid" onClick={() => onStep(4)}>last slide — check &amp; finish →</button>}
+                {idx < lesson.slides.length - 1 ? <button className="btn solid" onClick={() => go(1)}>next slide →</button> : (lesson.status === "ready" ? <span className="mute">last slide</span> : <button className="btn solid" onClick={() => onStep(4)}>last slide — ready for class →</button>)}
               </div>
             </div>
           </div>
@@ -589,7 +590,7 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
         <span className="row"><span className="mono mute">{lesson.slides.length} slides</span><button className="btn ghost" onClick={() => setFocus(true)}>one slide at a time</button></span>
       </div>
       {checkJob.error && <div className="err" style={{ marginBottom: 12 }}>Fact-check: {checkJob.error}</div>}
-      {busy && <Working since={job.started} what="Remaking slides" doing="Turning the research document into slides with talking points, speaker notes and your exhibits" usual="1–2 minutes" />}
+      {busy && <Working since={job.started} what="Remaking slides" doing="Turning your notes into slides with talking points and your pictures" usual="1–2 minutes" />}
       {err && <div className="err" style={{ marginBottom: 12 }}>{err}</div>}
       <div className="bench slides">
         {slide && (
@@ -630,100 +631,6 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
         <span className="mute">Drag frames to reorder. Slides are fact-checked automatically a few seconds after you stop editing. Everything saves automatically.</span>
       </div>
     </>
-  );
-}
-
-/* ───────── Step 4: check & finish ───────── */
-
-function FinishStep({ lesson, course, set }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void }) {
-  const router = useRouter();
-  const st = useStatus();
-  const job = useJob(`check:${lesson.id}`);
-  const busy = job.running;
-  const [pptx, setPptx] = useState(false);
-  const [err, setErr] = useState("");
-  const r = readiness(lesson);
-  const takeFix = (slideId: string, i: number) => {
-    const next = applyFix(lesson, slideId, i);
-    if (next) set(() => next);
-    return !!next;
-  };
-  const nums = (pred: (st: ReturnType<typeof slideState>) => boolean) => lesson.slides.map((x, i) => (pred(slideState(x)) ? i + 1 : 0)).filter(Boolean);
-  const uncheckedNums = nums((x) => x === "unchecked");
-  const problemNums = nums((x) => x === "problem");
-  const list = (ns: number[]) => (ns.length > 4 ? `${ns.slice(0, 4).join(", ")} and ${ns.length - 4} more` : ns.join(", "));
-
-  async function check(all: boolean) {
-    setErr("");
-    job.clearError();
-    await job.run(() => runCheck(lesson, set, all));
-  }
-
-  return (
-    <div className="stack">
-      <div className="readybar" style={{ marginTop: 0 }}>
-        <div className="row mono" style={{ gap: 18 }}>
-          <span className={`v ${r.problems ? "bad" : "ok"}`}>{r.problems} to fix</span>
-          <span className={`v ${r.unchecked ? "todo" : "ok"}`}>{r.unchecked} not checked</span>
-          <span className={`v ${r.unverified ? "unv" : "ok"}`}>{r.unverified} unverified</span>
-          {r.rights > 0 && <span className="mute">{r.rights} image(s): rights to check</span>}
-        </div>
-        <div className="row">
-          <button className="btn" disabled={busy || st?.claude === false || !lesson.slides.length} onClick={() => check(!r.unchecked)}>{busy ? "checking…" : r.unchecked ? `fact-check ${r.unchecked} slide(s) now` : "re-check all"}</button>
-        </div>
-      </div>
-      {busy && <Working since={job.started} what="Fact-checking" doing="Searching the web to check every name, date and claim on your slides" usual="1–3 minutes" />}
-      {(err || job.error) && <div className="err">{err || job.error}</div>}
-      <div className="list">
-        {lesson.slides.map((s, i) => {
-          const state = slideState(s);
-          return (
-            <div key={s.id} className="item" style={{ gridTemplateColumns: "180px 1fr" }}>
-              <SlideView s={s} n={lesson.number} />
-              <div>
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <b>{pad(i + 1)} · {s.title || "Untitled"}</b>
-                  <span className={`v ${stateMark[state]}`}>{stateText[state]}</span>
-                </div>
-                {s.check ? (s.check.claims.length ? <Claims claims={s.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, s.id, ci, ok))} onUseFix={(ci) => takeFix(s.id, ci)} /> : <p className="mute" style={{ margin: "4px 0 0" }}>No checkable facts.</p>) : <p className="mute" style={{ margin: "4px 0 0" }}>Not checked since the last change.</p>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <QuizBox lesson={lesson} course={course} set={set} />
-      <div className="nextbar">
-        <div className="row">
-          <button className="btn ghost" disabled={pptx || !lesson.slides.length} onClick={async () => { setPptx(true); try { await downloadPptx(lesson); } finally { setPptx(false); } }}>{pptx ? "Building…" : "PowerPoint ↓"}</button>
-          {lesson.research && <button className="btn ghost" onClick={() => downloadDocx(lesson, course)}>Research document ↓</button>}
-          <a className="btn ghost" href={`/handout/${lesson.id}`} target="_blank" rel="noreferrer">Student handout ↓</a>
-        </div>
-        <div className="row">
-          {!r.clean && (
-            <span className="mute" style={{ fontSize: 17 }}>
-              {!lesson.slides.length
-                ? "Add slides first."
-                : [
-                    r.problems ? `slide ${list(problemNums)}: a fact looks wrong (✗)` : "",
-                    r.unchecked ? `slide ${list(uncheckedNums)} not checked yet` : "",
-                    r.unverified ? `${r.unverified} slide(s) with unconfirmed facts` : "",
-                  ].filter(Boolean).join(" · ") + " — you can still go ahead."}
-            </span>
-          )}
-          {r.unchecked > 0 && (
-            <button className="btn" disabled={busy || st?.claude === false} onClick={() => check(false)}>{busy ? "checking…" : "check now"}</button>
-          )}
-          <button className="btn solid" disabled={!r.ok}
-            onClick={() => {
-              if (r.problems && !confirm(`The check thinks slide ${list(problemNums)} has a wrong fact. Go ahead anyway?`)) return;
-              set((l) => ({ ...l, status: "ready", readyAt: new Date().toISOString() }));
-              router.push(`/classes?open=${lesson.id}`);
-            }}>
-            {lesson.status === "ready" ? "Save to Classes →" : "Ready for class →"}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -772,7 +679,7 @@ export default function Prep() {
     if (params.get("new")) { setCreating(true); setStep(1); return; }
     const l = lessons.find((x) => x.id === want) ?? (!lessonId ? lessons.find((x) => x.status === "draft") : undefined);
     const asked = Number(params.get("step"));
-    if (l) { setLessonId(l.id); setStep(asked >= 1 && asked <= 4 ? (asked as Step) : params.get("slide") ? 3 : params.get("improve") ? 2 : l.slides.length ? 3 : l.research ? 2 : l.premise ? 2 : 1); }
+    if (l) { setLessonId(l.id); setStep(asked === 2 || asked === 3 ? (asked as Step) : asked === 4 || params.get("slide") ? 3 : params.get("improve") ? 2 : l.slides.length ? 3 : 2); }
     else if (!lessonId) setCreating(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, params]);
@@ -866,8 +773,8 @@ export default function Prep() {
         setStep(3);
         setTimeout(() => window.dispatchEvent(new CustomEvent("pine:goto-slide", { detail: o.slideId })), 50);
       } else if (o.op === "run_check") {
-        setStep(4);
-        say((await runJob(`check:${id}`, () => runCheck(latest(), upd))) ? "Fact-check done — see step 4." : "The fact-check didn't finish — try again in a moment.");
+        setStep(3);
+        say((await runJob(`check:${id}`, () => runCheck(latest(), upd))) ? "Fact-check done — anything to look at is marked ✗ on the slides." : "The fact-check didn't finish — try again in a moment.");
       } else if (o.op === "run_slides") {
         setStep(3);
         say((await runJob(`slides:${id}`, () => runSlides(latest(), c, upd, o.count).then(() => {}))) ? "New slides are ready (the old ones are under “earlier versions”)." : "Remaking the slides didn't finish — your current slides are unchanged.");
@@ -875,7 +782,7 @@ export default function Prep() {
         setStep(2);
         say((await runJob(`research:${id}`, () => runResearch(latest(), c, upd).then(() => {}))) ? "The new research document is ready (the old one is under “earlier versions”)." : "The new research didn't finish — your current document is unchanged.");
       } else if (o.op === "finish") {
-        setStep(4);
+        setStep(3);
         await runJob(`make:${id}`, async (stage) => {
           if (latest().slides.some((x) => !x.check)) {
             stage("checking the last slides");
@@ -910,83 +817,101 @@ export default function Prep() {
 
   if (!ready) return <main className="page"><p className="mute">Loading…</p></main>;
 
-  const steps: [Step, string][] = [[1, "Brief"], [2, "Research & ideas"], [3, "Slides"], [4, "Check & finish"]];
-  const done = (n: Step) => !!lesson && (n === 1 ? true : n === 2 ? !!(lesson.research || lesson.review) : n === 3 ? lesson.slides.length > 0 : lesson.status === "ready");
-  const byCourse = courses.map((c) => ({ c, ls: lessons.filter((l) => l.courseId === c.id).sort((a, b) => a.number - b.number) })).filter((g) => g.ls.length);
+  const tabs: [Step, string][] = [[2, "notes"], [3, "slides"]];
+  const r = lesson ? readiness(lesson) : null;
+  const firstProblem = lesson?.slides.find((x) => slideState(x) === "problem");
+  function markReady() {
+    if (!lesson || !r) return;
+    if (r.problems && !confirm(`The fact-check thinks ${r.problems} slide(s) may have a wrong fact. Mark the class ready anyway?`)) return;
+    set((l) => ({ ...l, status: "ready", readyAt: new Date().toISOString() }));
+    router.push(`/classes?open=${lesson.id}`);
+  }
 
   return (
     <main className={`page ${talk && lesson ? "withtalk" : ""}`}>
-      <div className="head" style={{ marginBottom: 18 }}>
-        <div className="grow">
-          <div className="mono mute">{lesson ? `${course} · Class ${pad(lesson.number)}${lesson.status === "ready" ? " · in Classes" : ""}${lesson.example ? " · example" : ""}` : "New class"}</div>
-          <h1 style={{ marginTop: 6 }}>{lesson ? lesson.topic : "Prep"}</h1>
+      {lesson ? (
+        <div className="head classhead" style={{ marginBottom: 14 }}>
+          <div className="grow">
+            <div className="mono mute">
+              <Link className="quietlink" href={`/classes?course=${lesson.courseId}`}>{course}</Link> · class {pad(lesson.number)}
+              {lesson.example ? " · example" : ""}
+              {" · "}
+              <select className="inlineselect" value={lesson.minutes ?? ""} onChange={(e) => set((l) => ({ ...l, minutes: Number(e.target.value) || undefined }))} aria-label="Class length">
+                <option value="">length not set</option>
+                {[50, 75, 100, 150].map((m) => <option key={m} value={m}>{m} minutes</option>)}
+              </select>
+            </div>
+            <h1 style={{ marginTop: 6 }}><Inline value={lesson.topic} onSave={(topic) => set((l) => ({ ...l, topic }))} placeholder="Class title" /></h1>
+            <p className="mute" style={{ margin: 0 }}><Inline multiline value={lesson.premise} onSave={(premise) => set((l) => ({ ...l, premise }))} placeholder="Click to add what this class is about" /></p>
+          </div>
+          <div className="row">
+            {history.current.length > 0 && <button className="linkish" onClick={undo} title="Undo the last change (⌘Z)">undo</button>}
+            {lesson.status === "ready"
+              ? <Link className="btn" href={`/classes?open=${lesson.id}`}>✓ ready — view class</Link>
+              : <button className="btn solid" disabled={!lesson.slides.length} onClick={markReady} title={lesson.slides.length ? "Puts it with your finished classes, with PowerPoint, notes, handout and quiz" : "Make the slides first"}>ready for class →</button>}
+          </div>
         </div>
-        <div className="row">
-          {lessons.length > 0 && (
-            <select className="select" style={{ width: "auto", maxWidth: 280 }} value={lesson?.id ?? ""} aria-label="Open a class"
-              onChange={(e) => { const l = lessons.find((x) => x.id === e.target.value); if (!l) return; setCreating(false); setLessonId(l.id); setStep(l.slides.length ? 3 : l.research ? 2 : 1); router.replace(`/prep?lesson=${l.id}`); }}>
-              <option value="" disabled>Open a class…</option>
-              {byCourse.map(({ c, ls }) => (
-                <optgroup key={c.id} label={c.name}>
-                  {ls.map((l) => <option key={l.id} value={l.id}>Class {l.number}: {l.topic}</option>)}
-                </optgroup>
-              ))}
-            </select>
-          )}
-          {history.current.length > 0 && <button className="btn ghost" onClick={undo} title="Undo the last change (⌘Z)">undo</button>}
-          <button className="btn ghost" onClick={() => { setCreating(true); setStep(1); router.replace("/prep?new=1"); }}>+ New class</button>
-        </div>
-      </div>
+      ) : (
+        <div className="head" style={{ marginBottom: 18 }}><h1>New class</h1></div>
+      )}
 
-      <nav className="steps" aria-label="Steps">
-        {steps.map(([n, label]) => (
-          <button key={n} className="stepb" aria-current={step === n ? "step" : undefined} disabled={!lesson && n !== 1} onClick={() => setStep(n)}>
-            <span className="mono">{done(n) && step !== n ? "✓" : pad(n)}</span> {label}
-          </button>
-        ))}
-      </nav>
+      {lesson && (
+        <nav className="steps" aria-label="Parts of the class">
+          {tabs.map(([n, label]) => (
+            <button key={n} className="stepb" aria-current={step === n ? "step" : undefined} onClick={() => setStep(n)}>{label}</button>
+          ))}
+          {step === 3 && lesson.slides.length > 0 && r && (
+            <span className="checkline mute">
+              {r.problems
+                ? <button className="linkish bad" onClick={() => firstProblem && window.dispatchEvent(new CustomEvent("pine:goto-slide", { detail: firstProblem.id }))}>✗ {r.problems} slide{r.problems === 1 ? "" : "s"} to look at</button>
+                : r.unchecked ? `checking ${r.unchecked} slide${r.unchecked === 1 ? "" : "s"}…` : "✓ fact-checked"}
+            </span>
+          )}
+        </nav>
+      )}
 
       {lesson && makeJob.running && (
         <div className="row" style={{ alignItems: "flex-start", gap: 18 }}>
-          <Working since={makeJob.started} what={makeJob.stage ? `Making your class — ${makeJob.stage}` : "Making your class"} doing="Researching, building slides with exhibits, then fact-checking. You can look around or work in another tab" usual="5–8 minutes" />
+          <Working since={makeJob.started} what={makeJob.stage ? `Making your class — ${makeJob.stage}` : "Making your class"} doing="Writing the notes, building slides with pictures, then fact-checking. You can look around or work in another tab" usual="5–8 minutes" />
           <button className="btn" onClick={() => { stopMaking(lesson.id); setStopAsked(true); }} disabled={stopAsked} title="Stops after the step that's running now; what's made so far is kept">{stopAsked ? "stopping after this step…" : "stop"}</button>
         </div>
       )}
       {lesson && makeJob.error && <div className="err" style={{ marginBottom: 14 }}>{makeJob.error}</div>}
-      {step === 1 && <Brief key={`brief-${lesson?.id ?? `new-${params.get("course") ?? ""}`}`} lesson={lesson} preset={params.get("course")} onSave={(b) => saveBrief(b)} onMake={(b) => { const l = saveBrief(b, 2); make(l); }} />}
+      {!lesson && <Brief key={`brief-new-${params.get("course") ?? ""}`} lesson={null} preset={params.get("course")} onSave={(b) => saveBrief(b)} onMake={(b) => { const l = saveBrief(b, 2); make(l); }} />}
       {lesson && step === 2 && (lesson.slides.length > 0 || (lesson.materials?.length ?? 0) > 0 || lesson.review) && (
-        <Improve key={`improve-${lesson.id}`} lesson={lesson} course={course} set={set} autoRun={params.get("improve") === "1"} />
+        <details className="fold" open={params.get("improve") === "1" || !!lesson.review?.suggestions.some((x) => x.status === "open")} style={{ marginTop: 0, marginBottom: 18 }}>
+          <summary>suggest improvements</summary>
+          <Improve key={`improve-${lesson.id}`} lesson={lesson} course={course} set={set} autoRun={params.get("improve") === "1"} />
+        </details>
       )}
+      {lesson && step === 2 && <ResearchStep lesson={lesson} course={course} set={set} onNext={() => setStep(3)} />}
       {lesson && step === 2 && !(lesson.slides.length > 0 || (lesson.materials?.length ?? 0) > 0 || lesson.review) && (
-        <div className="row" style={{ marginBottom: 14 }}>
-          <span className="mute">Have your own slides or handouts for this class?</span>
-          <UploadButton label="+ add materials" busy={upBusy} onFiles={async (files) => {
-            const r = await importAll(files, setUpBusy);
+        <div className="row" style={{ marginTop: 14 }}>
+          <span className="mute">Have your own slides or handouts?</span>
+          <UploadButton label="+ add them" busy={upBusy} onFiles={async (files) => {
+            const r2 = await importAll(files, setUpBusy);
             setUpBusy("");
-            if (r.errors.length) alert(r.errors.join("\n"));
-            set((l) => ({ ...l, slides: [...l.slides, ...r.slides], materials: [...(l.materials ?? []), ...r.materials] }));
+            if (r2.errors.length) alert(r2.errors.join("\n"));
+            set((l) => ({ ...l, slides: [...l.slides, ...r2.slides], materials: [...(l.materials ?? []), ...r2.materials] }));
           }} />
         </div>
       )}
-      {lesson && step === 2 && <ResearchStep lesson={lesson} course={course} set={set} onNext={() => setStep(3)} />}
-      {lesson && step === 3 && <SlidesStep key={`slides-${lesson.id}`} lesson={lesson} course={course} set={set} resources={resources} initial={params.get("slide")} onStep={(s) => setStep(s)} />}
-      {lesson && step === 4 && <FinishStep lesson={lesson} course={course} set={set} />}
+      {lesson && step === 3 && <SlidesStep key={`slides-${lesson.id}`} lesson={lesson} course={course} set={set} resources={resources} initial={params.get("slide")} onStep={(s) => (s === 4 ? markReady() : setStep(s))} />}
 
-      {lesson && (
-        <div className="stepnav" hidden={step === 3 && focusView}>
-          {step > 1 ? <button className="btn" onClick={() => setStep((step - 1) as Step)}>← back: {steps[step - 2][1].toLowerCase()}</button> : <span />}
-          {step < 4 && <button className="btn solid" onClick={() => setStep((step + 1) as Step)}>next: {steps[step][1].toLowerCase()} →</button>}
+      {lesson && step === 2 && (
+        <div className="stepnav">
+          <span />
+          <button className="btn solid" onClick={() => setStep(3)}>slides →</button>
+        </div>
+      )}
+      {lesson && step === 3 && !focusView && (
+        <div className="stepnav">
+          <button className="btn" onClick={() => setStep(2)}>← notes</button>
+          {lesson.status !== "ready" && <button className="btn solid" disabled={!lesson.slides.length} onClick={markReady}>ready for class →</button>}
         </div>
       )}
       {lesson && !talk && <button className="talk-open btn solid" onClick={() => setTalk(true)}>talk it through</button>}
       {lesson && talk && <Talk key={`talk-${lesson.id}`} lesson={lesson} course={course} set={set} close={() => setTalk(false)} onActions={onActions} shownSlide={() => (step === 3 ? shownSlide.current : null)} />}
-
-      {lesson && step === 1 && (
-        <p className="mute" style={{ fontSize: 16, marginTop: 14 }}>
-          Finished classes live in <Link href="/classes">Classes</Link>.{" "}
-          <button className="linkish" onClick={() => { if (confirm(`Delete Class ${lesson.number}: ${lesson.topic}? This removes its research and slides.`)) { updateLessons((cur) => cur.filter((l) => l.id !== lesson.id)); setLessonId(null); setCreating(true); router.replace("/prep?new=1"); } }}>Delete this class</button>
-        </p>
-      )}
     </main>
   );
 }

@@ -116,7 +116,7 @@ export default function SlideView({ s, n, edit }: { s: Slide; n?: number; edit?:
           ) : s.images[0] ? (
             <img src={src(s.images[0].url)} alt={s.images[0].credit} />
           ) : (
-            <div className="ph">{edit ? "Add an exhibit from the right, or drop one here" : "No picture"}</div>
+            <div className="ph">{edit ? "Add a picture or video below, or drop one here" : "No picture"}</div>
           )}
           {s.images[0] && ytId(s.images[0].url) && !edit && <span className="play" aria-hidden="true">▶</span>}
           {s.images[0] && remove(0)}

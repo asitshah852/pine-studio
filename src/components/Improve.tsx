@@ -16,7 +16,7 @@ const KIND: Record<Suggestion["kind"], string> = {
   accuracy: "accuracy",
   content: "content",
   discussion: "discussion",
-  exhibit: "exhibit",
+  exhibit: "picture or video",
   structure: "structure",
   clarity: "clarity",
 };
@@ -128,7 +128,7 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
       <p className="mute" style={{ marginTop: 6 }}>
         Reads your {lesson.slides.length} slide(s){mats.length ? ` and ${mats.length} file(s)` : ""}, checks the facts, and suggests changes, new discussion points and exhibits. You choose what to keep.
       </p>
-      {busy && <Working since={job.started} what="Reviewing your class" doing="Reading your slides and materials, checking the facts, and finding discussion points and museum exhibits" usual="2–3 minutes" />}
+      {busy && <Working since={job.started} what="Reviewing your class" doing="Reading your slides and materials, checking the facts, and finding discussion points, pictures and videos" usual="2–3 minutes" />}
       {uploading && <Working what="Bringing in your files" doing={uploading} usual="a few seconds per file" />}
       {err && <div className="err">{err}</div>}
 
@@ -206,7 +206,7 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
 
           {rv.exhibits.length > 0 && (
             <div>
-              <h3 className="h">Exhibits to consider</h3>
+              <h3 className="h">Pictures & videos to consider</h3>
               <p className="mute" style={{ margin: "0 0 10px" }}>Tick to make them available in the Slides step.</p>
               <div className="stack">
                 {rv.exhibits.map((e) => (

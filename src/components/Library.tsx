@@ -5,17 +5,16 @@ import { useEffect, useMemo, useState } from "react";
 import { api, uid, useCollection, useStatus } from "@/lib/client";
 import { pdfUrl } from "@/lib/textbooks";
 import { clearPdfError, enqueuePdf, resumePdfs, usePdfQueue } from "@/lib/pdfQueue";
-import { STARTER_ADDITIONS, STARTER_RESOURCES, findLinks, usage } from "@/lib/starter";
+import { STARTER_ADDITIONS, STARTER_RESOURCES, findLinks } from "@/lib/starter";
 import { load as loadLocal, save as saveLocal } from "@/lib/client";
 import type { Resource, ResourceKind } from "@/lib/types";
 
 const isFreeBook = (r: Resource) => r.kind === "textbook" && /free|open|CC BY/i.test(`${r.publisher ?? ""} ${r.notes}`);
 
+// Two sections only (Asit, Nov 2026): her stored books, then everything else.
 const SECTIONS: { key: string; title: string; note: string; test: (r: Resource) => boolean }[] = [
-  { key: "free", title: "Free textbooks", note: "Open textbooks you can assign at no cost to students.", test: isFreeBook },
-  { key: "images", title: "Museums & image collections", note: "Free essays, catalogues and open-access images.", test: (r) => r.kind === "museum" || r.kind === "website" },
-  { key: "access", title: "Through your libraries", note: "City Colleges of Chicago and the Chicago Public Library.", test: (r) => r.kind === "other" },
-  { key: "books", title: "Standard textbooks & journals", note: "Check your libraries for a copy before buying.", test: () => true },
+  { key: "mine", title: "your books", note: "", test: (r) => !!r.pdf },
+  { key: "rest", title: "free books and places to look", note: "", test: () => true },
 ];
 
 const KIND_LABEL: Record<ResourceKind, string> = { textbook: "Textbook", journal: "Journal", paper: "Paper or essay", museum: "Museum", website: "Website", video: "Video", other: "Library access" };
@@ -24,7 +23,6 @@ const blank = { kind: "textbook" as ResourceKind, title: "", url: "", author: ""
 export default function Library() {
   const { items, update, ready: libReady } = useCollection<Resource>("resources", STARTER_RESOURCES);
   const [q, setQ] = useState("");
-  const [onlySaved, setOnlySaved] = useState(false);
   const [form, setForm] = useState(blank);
   const [formOpen, setFormOpen] = useState(false);
   const [moreFields, setMoreFields] = useState(false);
@@ -85,8 +83,8 @@ export default function Library() {
 
   const shown = useMemo(() => {
     const t = q.toLowerCase().trim();
-    return items.filter((r) => (!onlySaved || r.pdf) && (!t || `${r.title} ${r.author ?? ""} ${r.publisher ?? ""} ${r.topics.join(" ")} ${r.notes}`.toLowerCase().includes(t)));
-  }, [items, q, onlySaved]);
+    return items.filter((r) => (!t || `${r.title} ${r.author ?? ""} ${r.publisher ?? ""} ${r.topics.join(" ")} ${r.notes}`.toLowerCase().includes(t)));
+  }, [items, q]);
   const savedCount = items.filter((r) => r.pdf).length;
 
   // Each resource goes in the first section it fits.
@@ -135,10 +133,7 @@ export default function Library() {
   return (
     <main className="page lib-page">
       <div className="head" style={{ marginBottom: 14 }}>
-        <div>
-          <h1>Library</h1>
-          <p>Free and open resources first, then what you can reach through City Colleges and the Chicago Public Library. Every title opens the real page.</p>
-        </div>
+        <h1>Library</h1>
       </div>
 
       <div className="lib-tools">
@@ -150,14 +145,7 @@ export default function Library() {
         {freeToSave.length > 0 && st?.pdfs !== false && (
           <><button className="linkish" onClick={saveAllFree}>save all free textbooks ({freeToSave.length})</button> · </>
         )}
-        {savedCount ? (
-          <>
-            <span className="savedtag static">saved</span> {savedCount} book{savedCount === 1 ? "" : "s"} stored in pine studio ·{" "}
-            <button className="linkish" onClick={() => setOnlySaved(!onlySaved)}>{onlySaved ? "show everything" : "show only saved"}</button>
-          </>
-        ) : (
-          <>Nothing stored yet. Hover over a free textbook and click <b>save a PDF copy</b>.</>
-        )}
+        {!savedCount && <>No books saved yet — hover over a free textbook and click <b>save a PDF copy</b>.</>}
       </div>
 
       {formOpen && (
@@ -194,7 +182,7 @@ export default function Library() {
       {grouped.map((g) => (
         <section key={g.key} className="lib-section">
           <h2>{g.title}</h2>
-          <p className="mute lib-note">{g.note}</p>
+          {g.note && <p className="mute lib-note">{g.note}</p>}
           {g.list.map((r) => (
             <article key={r.id} className="lib-item" title={r.starter ? "From the starter list, checked 19 Nov 2026 — confirm the edition or access." : undefined}>
               <div className="lib-main">
@@ -202,15 +190,12 @@ export default function Library() {
                   {r.url ? <a href={r.url} target="_blank" rel="noreferrer">{r.title}</a> : r.title}
                   {r.pdf && <a className="savedtag" href={pdfUrl(r.pdf.path)} target="_blank" rel="noreferrer" title="Your stored copy — click to open">saved</a>}
                 </h3>
-                <div className={`usage ${usage(r)}`}>
-                  {{ searched: "searched by pine studio for exhibits", research: "research prefers this site", copy: "your stored copy — research reads it", link: "a link to browse" }[usage(r)]}
-                </div>
                 {(r.author || r.publisher || r.year) && <div className="src">{[r.author, r.publisher, r.year].filter(Boolean).join(" · ")}</div>}
                 {r.notes && <p>{r.notes}</p>}
                 {r.pdf && (
                   <div className="pdfline">
                     <a href={pdfUrl(r.pdf.path)} target="_blank" rel="noreferrer">open your PDF ↗</a>
-                    {(r.kind === "textbook" && (r.pdf.pages ?? 999) < 40) && <span className="err-inline">only {r.pdf.pages} pages — this may be a sample, not the whole book; try “add a PDF” with the full book’s link · </span>}<span className="mute">{r.pdf.pages ? `${r.pdf.pages} pages · ` : ""}{r.pdf.size < 1e5 ? `${Math.max(1, Math.round(r.pdf.size / 1e3))} KB` : `${(r.pdf.size / 1e6).toFixed(1)} MB`}{r.pdf.textId ? " · ready for Prep’s textbook tool" : " · scanned (no text to pull from)"}</span>
+                    {(r.kind === "textbook" && (r.pdf.pages ?? 999) < 40) && <span className="err-inline">only {r.pdf.pages} pages — this may be a sample, not the whole book; try “add a PDF” with the full book’s link · </span>}<span className="mute">{r.pdf.pages ? `${r.pdf.pages} pages · ` : ""}{r.pdf.size < 1e5 ? `${Math.max(1, Math.round(r.pdf.size / 1e3))} KB` : `${(r.pdf.size / 1e6).toFixed(1)} MB`}{r.pdf.textId ? "" : " · scanned, so pine studio can’t read it"}</span>
                   </div>
                 )}
                 {pq.status.get(r.id) && (

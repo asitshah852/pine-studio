@@ -43,10 +43,10 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
         </div>
         <div className="row">
           <button className="btn" disabled={busy || !lesson.slides.length} onClick={async () => { setBusy(true); try { await downloadPptx(lesson); } finally { setBusy(false); } }}>{busy ? "Building…" : "PowerPoint ↓"}</button>
-          {doc && <button className="btn" onClick={() => downloadDocx(lesson, course)}>Document ↓</button>}
+          {doc && <button className="btn" onClick={() => downloadDocx(lesson, course)}>notes ↓</button>}
           <a className="btn" href={`/handout/${lesson.id}`} target="_blank" rel="noreferrer">Handout ↓</a>
           <Link className="btn ghost" href={`/prep?lesson=${lesson.id}&improve=1`}>suggest improvements</Link>
-          <Link className="btn ghost" href={`/prep?lesson=${lesson.id}`}>Edit in Prep</Link>
+          <Link className="btn ghost" href={`/prep?lesson=${lesson.id}`}>edit</Link>
           <button className="btn ghost" onClick={() => { if (confirm(`Delete Class ${lesson.number}: ${lesson.topic}? This removes its research and slides.`)) { updateLessons((cur) => cur.filter((l) => l.id !== lesson.id)); back(); } }}>Delete</button>
         </div>
       </div>
@@ -54,7 +54,7 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
       <nav className="steps" style={{ marginBottom: 22 }}>
         {(["slides", "document", ...((lesson.materials?.length ?? 0) ? (["materials"] as const) : []), "sources"] as const).map((t) => (
           <button key={t} className="stepb" aria-current={tab === t ? "step" : undefined} onClick={() => setTab(t)}>
-            {t === "slides" ? `Slides · ${lesson.slides.length}` : t === "document" ? "Research document" : t === "materials" ? `Your materials · ${lesson.materials?.length ?? 0}` : "Sources & readings"}
+            {t === "slides" ? `Slides · ${lesson.slides.length}` : t === "document" ? "Notes" : t === "materials" ? `Your materials · ${lesson.materials?.length ?? 0}` : "Sources & readings"}
           </button>
         ))}
       </nav>
@@ -107,14 +107,14 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
             )}
             {doc.exhibits.some((e) => e.match) && (
               <section>
-                <h3 className="h">Exhibits</h3>
+                <h3 className="h">Pictures & videos</h3>
                 {doc.exhibits.filter((e) => e.match).map((e) => (
                   <div key={e.id} className="src" style={{ marginBottom: 6 }}><a href={e.match!.url} target="_blank" rel="noreferrer">{caption(e.match!)}</a>{e.why && ` — ${e.why}`}</div>
                 ))}
               </section>
             )}
           </article>
-        ) : <div className="empty">No research document for this class. <Link href={`/prep?lesson=${lesson.id}`}>Research it in Prep →</Link></div>)}
+        ) : <div className="empty">No notes for this class yet. <Link href={`/prep?lesson=${lesson.id}&step=2`}>Write them →</Link></div>)}
 
       {tab === "sources" && (
         <div className="row" style={{ alignItems: "start", gap: 36 }}>
@@ -211,7 +211,14 @@ export default function Classes() {
     setOpen(params.get("open"));
   }, [params]);
 
+  useEffect(() => {
+    const l = lessons.find((x) => x.id === open);
+    if (l && l.status !== "ready") router.replace(`/prep?lesson=${l.id}`);
+  }, [open, lessons, router]);
+  // One place per class: a class still being made opens in its workspace; a finished one opens here.
+  const openClass = (l: Lesson) => (l.status === "ready" ? (setOpen(l.id), router.replace(`/classes?open=${l.id}`)) : router.push(`/prep?lesson=${l.id}`));
   const lesson = lessons.find((l) => l.id === open);
+  if (lesson && lesson.status !== "ready") return <main className="page"><p className="mute">Opening…</p></main>;
   if (lesson) return <ClassPage lesson={lesson} course={courseName(lesson.courseId)} back={() => { setOpen(null); router.replace(`/classes?course=${lesson.courseId}`); }} />;
   // A course chosen in the left-hand menu: show just that course and its classes.
   const only = courses.find((c) => c.id === params.get("course"));
@@ -301,7 +308,7 @@ export default function Classes() {
                     onDragLeave={() => setOverL((o) => (o === l.id ? null : o))}
                     onDrop={(e) => { e.preventDefault(); dropClass(l.id); }}
                     onDragEnd={() => { setDragL(null); setOverL(null); }}
-                    onKeyDown={(e) => { if (e.key === "Enter") { setOpen(l.id); router.replace(`/classes?open=${l.id}`); } }} onClick={() => { setOpen(l.id); router.replace(`/classes?open=${l.id}`); }}>
+                    onKeyDown={(e) => { if (e.key === "Enter") openClass(l); }} onClick={() => openClass(l)}>
                     <span className="num serif">{pad(l.number)}</span>
                     <span className="thumb">{l.slides[0] ? <SlideView s={l.slides[0]} n={l.number} /> : <span className="slide"><span className="ph">no slides</span></span>}</span>
                     <span className="grow">
@@ -326,7 +333,7 @@ export default function Classes() {
                   </div>
                 ))}
               </div>
-            ) : <div className="empty">No classes yet. <Link href={`/prep?new=1&course=${c.id}`}>Prepare the first one →</Link></div>}
+            ) : <div className="empty">No classes yet — <Link href={`/prep?new=1&course=${c.id}`}>add one</Link>, or plan the whole semester.</div>}
           </section>
         );
       })}

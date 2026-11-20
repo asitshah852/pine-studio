@@ -91,7 +91,7 @@ export default function Clip({ setup = false }: { setup?: boolean }) {
           <li>Drag this button up onto the bookmarks bar: {bookmarklet && <a className="clipbtn" href={bookmarklet} onClick={(e) => { e.preventDefault(); alert("Drag this button onto your bookmarks bar (don’t click it here)."); }}>＋ pine studio</a>}</li>
           <li>On any page, click <b>＋ pine studio</b> in the bookmarks bar. A small window opens: pick the class and send it. Highlight a passage first to keep that passage too.</li>
         </ol>
-        <p className="mute">What happens to a clip: a museum object page (Art Institute of Chicago, The Met, Cleveland) or a YouTube video becomes an exhibit, with the caption taken from the museum’s own record. Any other page is kept as a source the research for that class reads and cites, or saved to your Library.</p>
+        <p className="mute">What happens to a clip: a museum object page (Art Institute of Chicago, The Met, Cleveland) or a YouTube video becomes a picture or video for the class, with the caption taken from the museum’s own record. Any other page is kept as a source the notes for that class read and cite, or saved to your Library.</p>
       </main>
     );
 
@@ -126,7 +126,7 @@ export default function Clip({ setup = false }: { setup?: boolean }) {
             {options.map((l) => <option key={l.id} value={l.id}>{courseName(l.courseId)} · {pad(l.number)} {l.topic}{l.status === "ready" ? " (ready)" : ""}</option>)}
           </select>
           <div className="row" style={{ flexWrap: "wrap", marginTop: 14 }}>
-            {what?.artwork && <button className="btn solid" disabled={!lesson} onClick={asExhibit}>add as an exhibit</button>}
+            {what?.artwork && <button className="btn solid" disabled={!lesson} onClick={asExhibit}>add as a picture or video</button>}
             <button className={`btn ${what?.artwork ? "" : "solid"}`} disabled={!lesson || !what} onClick={asSource}>add as a source for research</button>
             <button className="linkish" onClick={toLibrary} disabled={!what}>save to Library</button>
           </div>

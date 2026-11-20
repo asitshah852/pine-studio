@@ -1,5 +1,7 @@
 # pine studio
 
+> **Nov 2026:** simplified — menu is home · classes · library (+ more: checker, feedback, clip button). A class opens in its workspace (two tabs: notes · slides, "ready for class →") until it is finished, then on its class page. See CLAUDE.md "Simplified".
+
 A teaching studio for an undergraduate **Art Appreciation** course in Chicago. Built for Tanya
 (adjunct professor of art, MFA in photography). Minimal black-and-white design; "Darkroom" is
 the dark mode. Works on laptop (prep) and phone (review).

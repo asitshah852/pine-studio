@@ -56,7 +56,7 @@ export default function Talk({ lesson, course, set, close, onActions, shownSlide
           <button className="btn sm ghost" onClick={close} aria-label="Close">close</button>
         </div>
       </div>
-      <p className="mute" style={{ margin: "4px 0 0", fontSize: 17 }}>Discuss the class with Claude. Ask it to add or change research, edit slides, or find exhibits — it makes the change and you can undo it.</p>
+      <p className="mute" style={{ margin: "4px 0 0", fontSize: 17 }}>Discuss the class with Claude. Ask it anything, or ask it to change the notes or slides or find pictures and videos — you can undo any change.</p>
 
       <div className="talk-msgs">
         {!msgs.length && (

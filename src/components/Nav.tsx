@@ -12,10 +12,13 @@ import Search from "./Search";
 const TABS = [
   ["/", "home"],
   ["/classes", "classes"],
-  ["/prep", "prep"],
   ["/library", "library"],
-  ["/checker", "checker"],
-  ["/feedback", "feedback"],
+] as const;
+// Less-used pages, folded under "more".
+const MORE = [
+  ["/checker", "checker", "check any text, screenshot or PDF for facts"],
+  ["/feedback", "feedback", "ask for a change to pine studio"],
+  ["/clipper", "clip button", "send any web page to a class from your bookmarks bar"],
 ] as const;
 
 export default function Nav() {
@@ -47,7 +50,8 @@ export default function Nav() {
   }
 
   // The course being shown (?course=… or the course of an open class) is greyed like the current page.
-  const here = path === "/classes" ? params.get("course") || lessons.find((l) => l.id === params.get("open"))?.courseId || null : null;
+  const here = path === "/classes" ? params.get("course") || lessons.find((l) => l.id === params.get("open"))?.courseId || null
+    : path === "/prep" ? lessons.find((l) => l.id === params.get("lesson"))?.courseId || params.get("course") || null : null;
   if (/^\/(handout|present|show|clip|quiz)(\/|$)/.test(path)) return null; // pages that stand on their own
   return (
     <aside className="side">
@@ -55,7 +59,7 @@ export default function Nav() {
       <nav aria-label="Sections">
         {TABS.map(([href, label]) => (
           <div key={href}>
-            <Link href={href} aria-current={(href === "/" ? path === "/" : path.startsWith(href) && !(href === "/classes" && here)) ? "page" : undefined}>{label}</Link>
+            <Link href={href} aria-current={(href === "/" ? path === "/" : (path.startsWith(href) || (href === "/classes" && path.startsWith("/prep"))) && !(href === "/classes" && here)) ? "page" : undefined}>{label}</Link>
             {href === "/classes" && courses.filter((c) => c.id !== OTHER).length > 0 && (
               <div className="sub" title="Drag to reorder · right-click to rename">
                 {courses.filter((c) => c.id !== OTHER).map((c) => (
@@ -94,13 +98,18 @@ export default function Nav() {
           </div>
         ))}
       </nav>
+      <details className="navmore" open={MORE.some(([h]) => path.startsWith(h))}>
+        <summary>more</summary>
+        {MORE.map(([href, label, hint]) => (
+          <Link key={href} href={href} title={hint} aria-current={path.startsWith(href) ? "page" : undefined}>{label}</Link>
+        ))}
+      </details>
       <button className="linkish searchlink" onClick={() => window.dispatchEvent(new Event("pine:search"))}>search <span className="mute">⌘K</span></button>
       <Search />
       <div className="foot">
         <span title={st ? `Research & fact-check: ${st.claude ? "on" : "off"}. Saving: ${st.db ? "shared across devices" : "this browser only"}.` : ""}>
           {st ? (st.claude ? "research on" : "research off") : ""}
         </span>
-        <Link className="linkish" href="/clipper" title="Send any web page to a class from your bookmarks bar">clip button</Link>
         <button className="linkish" onClick={toggle} aria-pressed={dark}>{dark ? "daylight" : "darkroom"}</button>
       </div>
       {needPass && (

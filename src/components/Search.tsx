@@ -83,7 +83,7 @@ export default function Search() {
         <input
           ref={input}
           className="input"
-          placeholder="Search classes, slides, research, exhibits, library…"
+          placeholder="Search classes, slides, notes, pictures, library…"
           value={q}
           onChange={(e) => { setQ(e.target.value); setI(0); }}
           onKeyDown={(e) => {
