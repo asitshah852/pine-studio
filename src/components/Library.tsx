@@ -35,6 +35,19 @@ export default function Library() {
   const [pdfLink, setPdfLink] = useState("");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const pq = usePdfQueue();
+  // Repair (Nov 2026): a saving bug could reduce the shared list to just the books she had touched.
+  // If most of the starter list is missing, put the missing entries back once (matched by link, or title when there is no link).
+  useEffect(() => {
+    if (!libReady || loadLocal<boolean>("pine.starter.repair1", false)) return;
+    update((cur) => {
+      const key = (r: Resource) => r.url || r.title;
+      const have = new Set(cur.map(key));
+      const missing = STARTER_RESOURCES.filter((a) => !have.has(key(a)));
+      return missing.length > STARTER_RESOURCES.length / 2 ? [...cur, ...missing.map((m) => ({ ...m, id: uid() }))] : cur;
+    });
+    saveLocal("pine.starter.repair1", true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libReady]);
   // Add entries that joined the starter list after launch (once, matched by link).
   useEffect(() => {
     if (!libReady || loadLocal<boolean>("pine.starter.v2", false)) return;
@@ -197,7 +210,7 @@ export default function Library() {
                 {r.pdf && (
                   <div className="pdfline">
                     <a href={pdfUrl(r.pdf.path)} target="_blank" rel="noreferrer">open your PDF ↗</a>
-                    <span className="mute">{r.pdf.pages ? `${r.pdf.pages} pages · ` : ""}{(r.pdf.size / 1e6).toFixed(1)} MB{r.pdf.textId ? " · ready for Prep’s textbook tool" : " · scanned (no text to pull from)"}</span>
+                    {(r.kind === "textbook" && (r.pdf.pages ?? 999) < 40) && <span className="err-inline">only {r.pdf.pages} pages — this may be a sample, not the whole book; try “add a PDF” with the full book’s link · </span>}<span className="mute">{r.pdf.pages ? `${r.pdf.pages} pages · ` : ""}{r.pdf.size < 1e5 ? `${Math.max(1, Math.round(r.pdf.size / 1e3))} KB` : `${(r.pdf.size / 1e6).toFixed(1)} MB`}{r.pdf.textId ? " · ready for Prep’s textbook tool" : " · scanned (no text to pull from)"}</span>
                   </div>
                 )}
                 {pq.status.get(r.id) && (

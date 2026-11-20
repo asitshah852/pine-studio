@@ -709,3 +709,4 @@ body.slidesfocus .page { max-width: none; padding-left: 28px; }
 .foldlist a { text-decoration: none; color: var(--ink); }
 .foldlist a:hover { text-decoration: underline; }
 .stepnav[hidden] { display: none; }
+.err-inline { color: var(--safelight); }

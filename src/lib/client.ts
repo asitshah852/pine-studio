@@ -111,7 +111,9 @@ async function flush(name: string) {
   pending.set(name, { changed: new Set(), deleted: new Set() }); // later edits collect afresh
   try {
     const r = await api<{ value: { id: string }[] | null }>(`/api/store/${name}`);
-    const merged = mergeLists(Array.isArray(r.value) ? r.value : [], latest.get(name) ?? local, p.changed, p.deleted);
+    // Nothing online yet: this device's whole list is the first copy. (Merging with an empty list
+    // would treat every untouched item as "deleted elsewhere" — that once emptied the Library.)
+    const merged = Array.isArray(r.value) ? mergeLists(r.value, latest.get(name) ?? local, p.changed, p.deleted) : (latest.get(name) ?? local).filter((x) => !p.deleted.has(x.id));
     await api(`/api/store/${name}`, { method: "PUT", body: JSON.stringify(merged) });
     rememberPending(name);
     const now = latest.get(name) ?? local;
