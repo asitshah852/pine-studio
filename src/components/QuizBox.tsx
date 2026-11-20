@@ -28,20 +28,19 @@ export default function QuizBox({ lesson, course, set }: { lesson: Lesson; cours
   return (
     <div className="quizbox">
       <div className="row" style={{ gap: 16, flexWrap: "wrap" }}>
-        <b style={{ fontWeight: 500 }}>quiz / exit ticket</b>
         {job.running ? (
           <Working since={job.started} what="Writing the quiz" doing="Writing questions only from this class’s research and slides, with an answer key" usual="about a minute" />
         ) : (
           <>
+            <button className="btn" onClick={make} disabled={!hasMaterial || st?.claude === false}>{q ? "make a new quiz" : "make a quiz"}</button>
             <select className="select" style={{ width: "auto" }} value={count} onChange={(e) => setCount(+e.target.value)} aria-label="Number of questions">
               {[3, 5, 8, 10].map((n) => <option key={n} value={n}>{n} questions</option>)}
             </select>
-            <button className="btn" onClick={make} disabled={!hasMaterial || st?.claude === false}>{q ? "make a new one" : "make a quiz"}</button>
           </>
         )}
         {q && !job.running && (
           <>
-            <button className="linkish" onClick={() => downloadQuiz(lesson, course)}>Word</button>
+            <button className="linkish" onClick={() => downloadQuiz(lesson, course)}>quiz (Word)</button>
             <Link className="linkish" href={`/quiz/${lesson.id}`} target="_blank">print / PDF</Link>
             <button className="linkish" onClick={() => setOpen(!open)}>{open ? "hide" : `show (${q.questions.length})`}</button>
           </>

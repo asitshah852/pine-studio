@@ -692,3 +692,8 @@ body.slidesfocus .page { max-width: none; padding-left: 28px; }
 .planchat .talk-msgs { overflow-y: auto; max-height: 470px; }
 .planchat .talk-input { display: flex; flex-direction: column; gap: 8px; }
 .queuebar { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; margin: 6px 0 18px; }
+/* click-to-edit text (class title and summary) */
+.inline-edit { outline: none; cursor: text; border-bottom: 1px solid transparent; display: inline-block; min-width: 4em; white-space: pre-wrap; }
+.inline-edit:hover { border-bottom-color: var(--line); }
+.inline-edit:focus { border-bottom-color: var(--ink2); }
+.inline-edit:empty::before { content: attr(data-placeholder); color: var(--mute); }

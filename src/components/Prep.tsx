@@ -17,7 +17,7 @@ import { STARTER_RESOURCES } from "@/lib/starter";
 import { OTHER, pad, useStudio } from "@/lib/studio";
 import type { Artwork, ChatOp, Claim, Lesson, ResearchDoc, Resource, ReviewDoc, Slide, Source } from "@/lib/types";
 import Claims from "./Claims";
-import Improve from "./Improve";
+import Improve, { importAll, UploadButton } from "./Improve";
 import Working from "./Working";
 import QuizBox from "./QuizBox";
 import Versions from "./Versions";
@@ -719,6 +719,7 @@ export default function Prep() {
   }, []);
   const makeJob = useJob(`make:${lessonId ?? "new"}`);
   const [stopAsked, setStopAsked] = useState(false);
+  const [upBusy, setUpBusy] = useState("");
   useEffect(() => { if (!makeJob.running) setStopAsked(false); }, [makeJob.running]);
   const history = useRef<Lesson[]>([]);
   const lastPush = useRef(0);
@@ -915,6 +916,17 @@ export default function Prep() {
       {step === 1 && <Brief key={`brief-${lesson?.id ?? `new-${params.get("course") ?? ""}`}`} lesson={lesson} preset={params.get("course")} onSave={(b) => saveBrief(b)} onMake={(b) => { const l = saveBrief(b, 2); make(l); }} />}
       {lesson && step === 2 && (lesson.slides.length > 0 || (lesson.materials?.length ?? 0) > 0 || lesson.review) && (
         <Improve key={`improve-${lesson.id}`} lesson={lesson} course={course} set={set} autoRun={params.get("improve") === "1"} />
+      )}
+      {lesson && step === 2 && !(lesson.slides.length > 0 || (lesson.materials?.length ?? 0) > 0 || lesson.review) && (
+        <div className="row" style={{ marginBottom: 14 }}>
+          <span className="mute">Have your own slides or handouts for this class?</span>
+          <UploadButton label="+ add materials" busy={upBusy} onFiles={async (files) => {
+            const r = await importAll(files, setUpBusy);
+            setUpBusy("");
+            if (r.errors.length) alert(r.errors.join("\n"));
+            set((l) => ({ ...l, slides: [...l.slides, ...r.slides], materials: [...(l.materials ?? []), ...r.materials] }));
+          }} />
+        </div>
       )}
       {lesson && step === 2 && <ResearchStep lesson={lesson} course={course} set={set} onNext={() => setStep(3)} />}
       {lesson && step === 3 && <SlidesStep key={`slides-${lesson.id}`} lesson={lesson} course={course} set={set} resources={resources} initial={params.get("slide")} />}

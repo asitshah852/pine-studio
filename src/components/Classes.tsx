@@ -8,127 +8,62 @@ import { useCollection } from "@/lib/client";
 import { downloadDocx } from "@/lib/docx";
 import { caption } from "@/lib/museum";
 import { downloadPptx } from "@/lib/pptx";
-import { deckSources, readiness } from "@/lib/slides";
+import { deckSources } from "@/lib/slides";
 import { STARTER_RESOURCES } from "@/lib/starter";
 import { OTHER, pad, useStudio } from "@/lib/studio";
 import { ACCEPT } from "@/lib/importers";
 import { uid } from "@/lib/client";
 import type { Lesson, Resource } from "@/lib/types";
-import Improve, { importAll, UploadButton } from "./Improve";
+import { importAll } from "./Improve";
 import Renamable from "./Renamable";
+import Inline from "./Inline";
 import Working from "./Working";
 import QuizBox from "./QuizBox";
 import Planner, { QueueControls } from "./Planner";
 import SlideView from "./SlideView";
 
-function Present({ lesson, close }: { lesson: Lesson; close: () => void }) {
-  const [i, setI] = useState(0);
-  const n = lesson.slides.length;
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => {
-      if (["ArrowRight", " ", "PageDown"].includes(e.key)) setI((x) => Math.min(n - 1, x + 1));
-      if (["ArrowLeft", "PageUp"].includes(e.key)) setI((x) => Math.max(0, x - 1));
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", k);
-    document.documentElement.requestFullscreen?.().catch(() => {});
-    return () => {
-      window.removeEventListener("keydown", k);
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [n]);
-  return (
-    <div className="present" onClick={() => setI((x) => Math.min(n - 1, x + 1))}>
-      {lesson.slides[i].artworks[0]?.video ? (
-        <>
-          <div className="vcap" onClick={(e) => e.stopPropagation()}>{lesson.slides[i].title}</div>
-          <iframe
-            className="videoframe"
-            src={`https://www.youtube-nocookie.com/embed/${lesson.slides[i].artworks[0].video!.id}?rel=0`}
-            title={lesson.slides[i].artworks[0].title}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-            allowFullScreen
-            onClick={(e) => e.stopPropagation()}
-          />
-        </>
-      ) : (
-        <SlideView s={lesson.slides[i]} n={lesson.number} />
-      )}
-      <div className="pnav mono" onClick={(e) => e.stopPropagation()}>
-        <button className="btn sm" onClick={() => setI(Math.max(0, i - 1))}>←</button>
-        <span>{i + 1} / {n}</span>
-        <button className="btn sm" onClick={() => setI(Math.min(n - 1, i + 1))}>→</button>
-        <button className="btn sm" onClick={close}>Esc</button>
-      </div>
-    </div>
-  );
-}
-
 function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; back: () => void }) {
   const { updateLessons } = useStudio();
   const { items: resources } = useCollection<Resource>("resources", STARTER_RESOURCES);
   const [tab, setTab] = useState<"slides" | "document" | "materials" | "sources">("slides");
-  const [uploading, setUploading] = useState("");
-  const [upErr, setUpErr] = useState("");
-  async function upload(files: File[]) {
-    setUpErr("");
-    const r = await importAll(files, setUploading);
-    setUploading("");
-    if (r.errors.length) setUpErr(r.errors.join(" "));
-    updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? { ...l, slides: [...l.slides, ...r.slides], materials: [...(l.materials ?? []), ...r.materials] } : l)));
-    setTab(r.slides.length ? "slides" : "materials");
-  }
-  const [presenting, setPresenting] = useState(false);
+  const setLesson = (fn: (l: Lesson) => Lesson) => updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? fn(l) : l)));
   const [busy, setBusy] = useState(false);
-  const r = readiness(lesson);
   const doc = lesson.research;
   const src = deckSources(lesson.slides);
   const reads = resources.filter((x) => lesson.readings.includes(x.id));
 
   return (
     <main className="page">
-      {presenting && <Present lesson={lesson} close={() => setPresenting(false)} />}
       <button className="btn ghost sm" onClick={back}>← All classes</button>
       <div className="head" style={{ marginTop: 18 }}>
         <div>
           <div className="mono mute">{course} · Class {pad(lesson.number)}{lesson.example ? " · example" : ""}</div>
-          <h1 style={{ marginTop: 6 }}><Renamable value={lesson.topic} onSave={(topic) => updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? { ...l, topic } : l)))} /></h1>
-          {lesson.premise && <p>{lesson.premise}</p>}
+          <h1 style={{ marginTop: 6 }}><Inline value={lesson.topic} onSave={(topic) => setLesson((l) => ({ ...l, topic }))} placeholder="Class title" /></h1>
+          <p><Inline multiline value={lesson.premise} onSave={(premise) => setLesson((l) => ({ ...l, premise }))} placeholder="Click to add a short summary of this class" /></p>
         </div>
         <div className="row">
-          {lesson.slides.length > 0 && <Link className="btn solid" href={`/present/${lesson.id}`} title="Your laptop shows notes, the next slide and a clock; the projector shows the slide">presenter view</Link>}
-          <button className="btn" onClick={() => setPresenting(true)} disabled={!lesson.slides.length}>present (one screen)</button>
           <button className="btn" disabled={busy || !lesson.slides.length} onClick={async () => { setBusy(true); try { await downloadPptx(lesson); } finally { setBusy(false); } }}>{busy ? "Building…" : "PowerPoint ↓"}</button>
           {doc && <button className="btn" onClick={() => downloadDocx(lesson, course)}>Document ↓</button>}
           <a className="btn" href={`/handout/${lesson.id}`} target="_blank" rel="noreferrer">Handout ↓</a>
           <Link className="btn ghost" href={`/prep?lesson=${lesson.id}&improve=1`}>suggest improvements</Link>
-          <UploadButton label="+ add materials" onFiles={upload} busy={uploading} />
           <Link className="btn ghost" href={`/prep?lesson=${lesson.id}`}>Edit in Prep</Link>
           <button className="btn ghost" onClick={() => { if (confirm(`Delete Class ${lesson.number}: ${lesson.topic}? This removes its research and slides.`)) { updateLessons((cur) => cur.filter((l) => l.id !== lesson.id)); back(); } }}>Delete</button>
         </div>
       </div>
-      <div className="row mono" style={{ marginBottom: 18, gap: 18 }}>
-        <span className={`v ${lesson.status === "ready" ? "ok" : "todo"}`}>{lesson.status === "ready" ? "ready for class" : "in prep"}</span>
-        <span className={`v ${r.problems ? "bad" : r.unchecked ? "todo" : r.unverified ? "unv" : "ok"}`}>
-          {r.problems ? `${r.problems} slide(s) with errors` : r.unchecked ? `${r.unchecked} slide(s) not checked` : r.unverified ? `${r.unverified} slide(s) unverified` : "fact-checked"}
-        </span>
-        {r.rights > 0 && <span className="mute">{r.rights} image(s): rights to check</span>}
-      </div>
-
-      <QuizBox lesson={lesson} course={course} set={(fn) => updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? fn(l) : l)))} />
-      {upErr && <div className="err" style={{ marginBottom: 14 }}>{upErr}</div>}
+      <QuizBox lesson={lesson} course={course} set={setLesson} />
       <nav className="steps" style={{ marginBottom: 22 }}>
-        {(["slides", "document", "materials", "sources"] as const).map((t) => (
+        {(["slides", "document", ...((lesson.materials?.length ?? 0) ? (["materials"] as const) : []), "sources"] as const).map((t) => (
           <button key={t} className="stepb" aria-current={tab === t ? "step" : undefined} onClick={() => setTab(t)}>
             {t === "slides" ? `Slides · ${lesson.slides.length}` : t === "document" ? "Research document" : t === "materials" ? `Your materials · ${lesson.materials?.length ?? 0}` : "Sources & readings"}
           </button>
         ))}
       </nav>
       {tab === "materials" && (
-        (lesson.materials?.length ?? 0) ? (
-          <Improve lesson={lesson} course={course} set={(fn) => updateLessons((cur) => cur.map((l) => (l.id === lesson.id ? fn(l) : l)))} />
-        ) : <div className="empty">No uploaded files. Use “+ add materials” to bring in your slides (PowerPoint), handouts (PDF, Word) or images.</div>
+        <div className="list">
+          {(lesson.materials ?? []).map((m) => (
+            <div key={m.id}><b style={{ fontWeight: 500 }}>{m.name}</b><p className="mute" style={{ margin: "4px 0 0" }}>{m.preview.slice(0, 280)}{m.preview.length > 280 ? "…" : ""}</p></div>
+          ))}
+        </div>
       )}
 
       {tab === "slides" &&
