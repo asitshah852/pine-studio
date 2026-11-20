@@ -67,6 +67,7 @@ export const pauseQueue = () => set({ paused: true });
 export const resumeQueue = () => set({ paused: false });
 export const stopQueue = () => set({ stopping: true, paused: false });
 export const clearQueue = () => save(QKEY, []);
+export const saveQueue = (ids: string[]) => save(QKEY, ids);
 
 export function useMakeQueue() {
   const [, tick] = useState(0);

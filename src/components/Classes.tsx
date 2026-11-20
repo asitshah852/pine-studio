@@ -1,5 +1,5 @@
 "use client";
-// Classes: courses, each with its classes by number and topic. Open a class to present it,
+// Classes: courses, each with its classes by number and topic. Open a class to work on it or,
 // download the PowerPoint or the research document, or send it back to Prep.
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -231,12 +231,11 @@ export default function Classes() {
         {only ? (
           <div>
             <Link className="linkish mute" href="/classes">← all courses</Link>
-            <p style={{ marginTop: 10 }}>Open a class to present it or download it. Drag a class up or down to change its order; right-click a name to rename it.</p>
           </div>
         ) : (
           <div>
             <h1>Classes</h1>
-            <p>Your courses and their classes — or pick a course in the menu to see just that one. Open a class to present it or download it. Drag a class up or down to change its order; right-click a name to rename it.</p>
+            <p className="mute">Pick a course in the menu to see just that one.</p>
           </div>
         )}
         {!only && (
@@ -246,7 +245,7 @@ export default function Classes() {
         )}
       </div>
 
-      <QueueControls />
+      {only && <QueueControls courseId={only.id} />}
       {adding && (
         <form className="card row" style={{ marginBottom: 28, maxWidth: 560 }} onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; const id = Math.random().toString(36).slice(2, 10); updateCourses((cur) => [...cur, { id, name: name.trim() }]); setName(""); setAdding(false); router.push(`/classes?course=${id}`); }}>
           <input className="input grow" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Course name, e.g. Art Appreciation 103" />

@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiJob, load, uid, useCollection, useStatus } from "@/lib/client";
 import { forget, recover, useJob, wasCancelled } from "@/lib/jobs";
-import { clearQueue, pauseQueue, queued, resumeQueue, startQueue, stopQueue, useMakeQueue } from "@/lib/makeQueue";
+import { clearQueue, pauseQueue, queued, resumeQueue, saveQueue, startQueue, stopQueue, useMakeQueue } from "@/lib/makeQueue";
 import { STARTER_RESOURCES } from "@/lib/starter";
 import { useStudio } from "@/lib/studio";
 import { pdfUrl } from "@/lib/textbooks";
@@ -27,13 +27,15 @@ const blank = (): Plan => ({ at: new Date().toISOString(), weeks: 16, perWeek: 2
 const lessonsNow = () => load<Lesson[]>("pine.lessons", []);
 
 /** Making-classes progress with pause / resume / stop. Shown on Classes and in the planner. */
-export function QueueControls() {
+/** With a courseId it only speaks about that course's classes (and stays silent otherwise). */
+export function QueueControls({ courseId }: { courseId?: string }) {
   const q = useMakeQueue();
   const { lessons, updateLessons, courseName } = useStudio();
   const [waiting, setWaiting] = useState<string[]>([]);
   useEffect(() => setWaiting(queued()), [q.running]);
   const cur = lessons.find((l) => l.id === q.current);
-  if (q.running)
+  const mine = (id: string) => !courseId || lessons.some((l) => l.id === id && l.courseId === courseId);
+  if (q.running && (!courseId || (cur && cur.courseId === courseId)))
     return (
       <div className="queuebar">
         <Working what={`Making your classes — ${q.left} to go${q.paused ? " (paused)" : ""}`} doing={cur ? `Now: class ${cur.number}, ${cur.topic}. Research, slides and fact-check for each class in turn` : "Research, slides and fact-check for each class in turn"} usual="4–6 minutes per class" />
@@ -43,13 +45,18 @@ export function QueueControls() {
         </div>
       </div>
     );
-  const left = waiting.filter((id) => lessons.some((l) => l.id === id && !(l.research && l.slides.length)));
+  if (q.running) return null;
+  const left = waiting.filter((id) => mine(id) && lessons.some((l) => l.id === id && !(l.research && l.slides.length)));
   if (!left.length) return null;
   return (
     <div className="row queuebar">
       <span>{left.length} planned class{left.length === 1 ? " is" : "es are"} still to be made.</span>
-      <button className="btn" onClick={() => startQueue([], (id) => lessonsNow().find((l) => l.id === id), (id, fn) => updateLessons((c) => c.map((l) => (l.id === id ? fn(l) : l))), (l) => courseName(l.courseId))}>carry on making them</button>
-      <button className="linkish" onClick={() => { clearQueue(); setWaiting([]); }}>not now</button>
+      <button className="btn" onClick={() => {
+        // this course's classes first; any others queued stay behind them
+        saveQueue([...left, ...queued().filter((id) => !left.includes(id))]);
+        startQueue([], (id) => lessonsNow().find((l) => l.id === id), (id, fn) => updateLessons((c) => c.map((l) => (l.id === id ? fn(l) : l))), (l) => courseName(l.courseId));
+      }}>carry on making them</button>
+      <button className="linkish" onClick={() => { const rest = queued().filter((id) => !left.includes(id)); if (rest.length) saveQueue(rest); else clearQueue(); setWaiting(rest); }}>not now</button>
     </div>
   );
 }
@@ -243,7 +250,7 @@ export default function Planner({ course, close }: { course: Course; close: () =
           <span className="mute small">“make” builds each class in turn (about 4–6 minutes each) while a pine studio page stays open; pause or stop at any time.</span>
         </>
       )}
-      <QueueControls />
+      <QueueControls courseId={course.id} />
     </div>
   );
 }

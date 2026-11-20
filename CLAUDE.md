@@ -15,6 +15,7 @@
   4. Plain words: "notes" (not research document), "pictures & videos" (not exhibits), "tidy the writing" (not house style), "write new notes", "make the slides".
   5. The chat does most things; rarely used buttons sit behind "more" (notes: Word ↓ + more → tidy the writing / write new notes / earlier versions / delete; slides: "+ more" above the slides → make/remake, how many slides, + blank slide, versions, show all slides). "Suggest improvements" in notes is folded unless a review is open.
   6. Library: two sections, "your books" (saved PDFs) and "free books and places to look"; no intro text, section notes, usage labels or "show only saved".
+  8. A course page shows only that course: the "N planned classes still to be made" note and the making progress (QueueControls courseId) appear only on the course they belong to, not on other courses or the all-courses list; "carry on" starts with that course's classes, "not now" drops only those. No help paragraph on course pages.
   7. Empty states say one thing to do ("No notes yet… write the notes", "No slides yet…", "No classes yet — add one, or plan the whole semester").
 - Name: **pine studio** (always lower case). Repo `asitshah852/pine-studio`, separate from other projects.
 - Tabs (Asit, Nov 2026): Classes (by course) · Prep (1 Brief → 2 Research doc + questions + exhibits → 3 auto slides with one talking-points box per slide → 4 Check & finish) · Library · Checker · Feedback. See README.md.
