@@ -269,7 +269,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
 
 /* ───────── Step 3: slides ───────── */
 
-function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; resources: Resource[]; initial?: string | null }) {
+function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesson: Lesson; course: string; set: (fn: (l: Lesson) => Lesson) => void; resources: Resource[]; initial?: string | null; onStep: (s: 2 | 4) => void }) {
   const st = useStatus();
   const [sel, setSel] = useState<string | null>(initial ?? null);
   const [more, setMore] = useState(false);
@@ -478,7 +478,6 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
                 <label className="label mono">talking points — what you’ll say while this slide is up (not shown on the slide)</label>
                 <textarea className="area talkpts" rows={4} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })}
                   placeholder="A way in from the last slide, the context students need, a question to ask, how this connects to the next idea…" />
-                <div className="mute" style={{ fontSize: 16, marginTop: 4 }}>In your presenter view and PowerPoint notes. Or ask the chat: “write talking points for this slide”.</div>
               </div>
               {slide.check && slide.check.claims.length > 0 && (
                 <Claims claims={slide.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, slide.id, ci, ok))} onUseFix={(ci) => takeFix(slide.id, ci)} />
@@ -573,6 +572,10 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
                   <ReusePanel lesson={lesson} onAdd={(add) => { setSlides((x) => { const i = x.findIndex((y) => y.id === slide.id); const c = [...x]; c.splice(i + 1, 0, ...add); return c; }); if (add[0]) setSel(add[0].id); setDrawer(""); }} />
                 </div>
               )}
+              <div className="stepnav slidenav">
+                {idx > 0 ? <button className="btn" onClick={() => go(-1)}>← previous slide</button> : <button className="btn" onClick={() => onStep(2)}>← back: research &amp; ideas</button>}
+                {idx < lesson.slides.length - 1 ? <button className="btn solid" onClick={() => go(1)}>next slide →</button> : <button className="btn solid" onClick={() => onStep(4)}>last slide — check &amp; finish →</button>}
+              </div>
             </div>
           </div>
         )}
@@ -737,8 +740,10 @@ export default function Prep() {
   const [talk, setTalk] = useState(false);
   const shownSlide = useRef<string | null>(null);
   const autoTalk = useRef(false);
+  const [focusView, setFocusView] = useState(false); // slides shown one at a time: the bottom bar moves between slides
   useEffect(() => {
     const f = (e: Event) => {
+      setFocusView(!!(e as CustomEvent<boolean>).detail);
       if ((e as CustomEvent<boolean>).detail && !autoTalk.current && window.innerWidth >= 1200) {
         autoTalk.current = true;
         setTalk(true);
@@ -964,11 +969,11 @@ export default function Prep() {
         </div>
       )}
       {lesson && step === 2 && <ResearchStep lesson={lesson} course={course} set={set} onNext={() => setStep(3)} />}
-      {lesson && step === 3 && <SlidesStep key={`slides-${lesson.id}`} lesson={lesson} course={course} set={set} resources={resources} initial={params.get("slide")} />}
+      {lesson && step === 3 && <SlidesStep key={`slides-${lesson.id}`} lesson={lesson} course={course} set={set} resources={resources} initial={params.get("slide")} onStep={(s) => setStep(s)} />}
       {lesson && step === 4 && <FinishStep lesson={lesson} course={course} set={set} />}
 
       {lesson && (
-        <div className="stepnav">
+        <div className="stepnav" hidden={step === 3 && focusView}>
           {step > 1 ? <button className="btn" onClick={() => setStep((step - 1) as Step)}>← back: {steps[step - 2][1].toLowerCase()}</button> : <span />}
           {step < 4 && <button className="btn solid" onClick={() => setStep((step + 1) as Step)}>next: {steps[step][1].toLowerCase()} →</button>}
         </div>

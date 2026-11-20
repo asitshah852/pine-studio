@@ -708,3 +708,4 @@ body.slidesfocus .page { max-width: none; padding-left: 28px; }
 .foldlist li { display: flex; justify-content: space-between; gap: 18px; padding: 6px 0; border-bottom: 1px solid var(--soft); }
 .foldlist a { text-decoration: none; color: var(--ink); }
 .foldlist a:hover { text-decoration: underline; }
+.stepnav[hidden] { display: none; }
