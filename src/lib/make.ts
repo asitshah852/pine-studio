@@ -58,11 +58,15 @@ export async function runCheck(l: Lesson, set: Set, all = false): Promise<void> 
 }
 
 /** One click: research → slides (with the matched exhibits) → fact-check. */
-export async function makeClass(l: Lesson, course: string, set: Set, stage: (s: string) => void) {
+/** `gate` runs between steps: it waits while making is paused and throws Stopped if she stopped it. */
+export async function makeClass(l: Lesson, course: string, set: Set, stage: (s: string) => void, gate: () => Promise<void> = async () => {}) {
+  await gate();
   stage("researching");
-  const research = await runResearch(l, course, set);
+  const research = l.research ?? (await runResearch(l, course, set));
+  await gate();
   stage("making slides");
-  const slides = await runSlides({ ...l, research }, course, set);
+  const slides = l.slides.length ? l.slides : await runSlides({ ...l, research }, course, set);
+  await gate();
   stage("fact-checking");
   await runCheck({ ...l, research, slides }, set, true);
 }

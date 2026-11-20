@@ -18,7 +18,7 @@ import Improve, { importAll, UploadButton } from "./Improve";
 import Renamable from "./Renamable";
 import Working from "./Working";
 import QuizBox from "./QuizBox";
-import Planner, { MakeQueueNote } from "./Planner";
+import Planner, { QueueControls } from "./Planner";
 import SlideView from "./SlideView";
 
 function Present({ lesson, close }: { lesson: Lesson; close: () => void }) {
@@ -292,7 +292,7 @@ export default function Classes() {
         </div>
       </div>
 
-      <MakeQueueNote />
+      <QueueControls />
       {adding && (
         <form className="card row" style={{ marginBottom: 28, maxWidth: 560 }} onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; updateCourses((cur) => [...cur, { id: Math.random().toString(36).slice(2, 10), name: name.trim() }]); setName(""); setAdding(false); }}>
           <input className="input grow" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Course name, e.g. Art Appreciation 103" />

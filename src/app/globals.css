@@ -684,3 +684,11 @@ body.slidesfocus .page { max-width: none; padding-left: 28px; }
 .fmtbar .sep { width: 1px; height: 22px; background: var(--line); margin: 0 6px; }
 .fmtbar .hint { color: var(--mute); font-size: 15px; margin-left: 8px; }
 .talkpts { width: 100%; min-height: 110px; }
+/* planner: sources, chat, make controls */
+.srcchips { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.srcchip { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--mute); }
+.srcchip.on { color: var(--ink); }
+.planchat { display: flex; flex-direction: column; gap: 10px; max-height: 620px; border-top: 1px solid var(--line); padding-top: 14px; }
+.planchat .talk-msgs { overflow-y: auto; max-height: 470px; }
+.planchat .talk-input { display: flex; flex-direction: column; gap: 8px; }
+.queuebar { display: flex; align-items: flex-start; gap: 18px; flex-wrap: wrap; margin: 6px 0 18px; }

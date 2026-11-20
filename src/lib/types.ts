@@ -143,8 +143,19 @@ export type QuizQuestion = { id: string; kind: "choice" | "short"; q: string; op
 export type Quiz = { at: string; questions: QuizQuestion[]; exit: string[] };
 
 /** Semester planner: a suggested class for a course, before it is created. */
-export type PlanItem = { id: string; week: number; topic: string; premise: string; theme?: string; use: boolean };
-export type Plan = { at: string; weeks: number; perWeek: number; themes: string; items: PlanItem[] };
+export type PlanItem = { id: string; week: number; topic: string; premise: string; theme?: string; basis?: string; sources?: Source[]; use: boolean };
+export type Plan = {
+  at: string;
+  weeks: number;
+  perWeek: number;
+  minutes?: number;
+  themes: string;
+  items: PlanItem[];
+  chat?: ChatMessage[]; // the planning conversation (last 40)
+  docs?: Material[]; // syllabi, outlines etc. she uploaded for planning this course
+  use?: string[]; // ids of the textbooks / documents the plan should be based on
+  undo?: PlanItem[]; // the list before the last change from the chat
+};
 
 export type Clip = { id: string; url: string; title: string; text?: string; note?: string; at: string };
 

@@ -38,16 +38,18 @@ export function useJob(key: string) {
     },
     async run(fn: () => Promise<void>) {
       if (jobs.get(key) && !jobs.get(key)!.error) return;
-      jobs.set(key, { started: Date.now() });
+      const started = Date.now();
+      jobs.set(key, { started });
       emit();
       try {
         await fn();
-        jobs.delete(key);
+        if (!wasCancelled(key, started)) jobs.delete(key);
       } catch (e) {
-        jobs.set(key, { started: 0, error: (e as Error).message });
+        if (!wasCancelled(key, started)) jobs.set(key, { started: 0, error: (e as Error).message });
       }
       emit();
     },
+    stop: () => cancelJob(key),
   };
 }
 
@@ -115,3 +117,14 @@ export async function runJob(key: string, fn: (stage: (s: string) => void) => Pr
     return false;
   }
 }
+
+/** Stop: stop showing a job and throw its result away (a server step already under way finishes on
+ *  its own and is ignored). Code that applies a result checks wasCancelled(key, started) first. */
+const cancelledAt = new Map<string, number>();
+export function cancelJob(key: string) {
+  cancelledAt.set(key, Date.now());
+  jobs.delete(key);
+  emit();
+  forget(key);
+}
+export const wasCancelled = (key: string, started: number) => (cancelledAt.get(key) ?? 0) >= started;

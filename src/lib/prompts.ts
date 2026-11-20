@@ -2,7 +2,7 @@
 import { ask, groundSources, normUrl, parseJson } from "./claude";
 import { caption, findWork } from "./museum";
 import { normBody } from "./slideText";
-import type { Artwork, Claim, ExhibitSuggestion, PlanItem, Quiz, QuizQuestion, ResearchDoc, ReviewDoc, Slide, Source, Suggestion, TextbookPoint, Verdict } from "./types";
+import type { Artwork, Claim, ExhibitSuggestion, Quiz, QuizQuestion, ResearchDoc, ReviewDoc, Slide, Source, Suggestion, TextbookPoint, Verdict } from "./types";
 
 const rid = () => Math.random().toString(36).slice(2, 10);
 
@@ -425,44 +425,4 @@ Return ONLY JSON (in a \`\`\`json block):
     .filter((q) => q.from && (q.kind === "short" || q.options!.includes(q.answer)));
   if (!questions.length) throw new Error("Couldn't write questions from this class's material. Make the research or slides first.");
   return { at: new Date().toISOString(), questions, exit: (out.exit ?? []).map(String).filter(Boolean).slice(0, 3) };
-}
-
-/** Semester planner: a sequence of class topics with a one-line premise each. It is a teaching plan
- *  (opinion), so no facts are stated; each class's facts are researched and sourced when it is made. */
-export async function plan(input: {
-  course: string;
-  weeks: number;
-  perWeek: number;
-  minutes?: number;
-  themes: string;
-  existing: { number: number; topic: string }[];
-}): Promise<PlanItem[]> {
-  const weeks = Math.max(1, Math.min(18, input.weeks));
-  const per = Math.max(1, Math.min(3, input.perWeek));
-  const { text } = await ask({
-    system: `You help Tanya, an adjunct professor with an MFA in photography, plan an undergraduate course (Chicago community college students, many new to art).
-- Suggest a clear, teachable sequence: each class builds on the last; mix periods, media, cultures and voices; leave room for a review class before a midterm/final if the semester is long enough.
-- Topics and premises are teaching ideas, not facts: do NOT state dates, names of specific works, attributions or numbers. Those are researched and sourced later, class by class.
-- Premise = her angle in one plain sentence (the question or idea the class explores).`,
-    effort: "medium",
-    content: [
-      {
-        type: "text",
-        text: `Course: ${input.course || "Art Appreciation"}.
-Length: ${weeks} weeks, ${per} class${per > 1 ? "es" : ""} a week${input.minutes ? `, ${input.minutes} minutes each` : ""} = ${weeks * per} classes.
-Her themes / must-cover topics / notes: ${input.themes || "(none — use a standard Art Appreciation arc)"}
-Classes she already has (keep them, plan around them, don't repeat them):
-${input.existing.map((e) => `${e.number}. ${e.topic}`).join("\n") || "(none)"}
-
-Return ONLY JSON (in a \`\`\`json block): { "items": [ { "week": 1, "topic": "short class title", "premise": "one sentence", "theme": "which of her themes it serves, or empty" } ] }
-Exactly ${Math.max(1, weeks * per - input.existing.length)} items for the classes she does NOT have yet, in teaching order.`,
-      },
-    ],
-  });
-  const out = parseJson<{ items?: Partial<PlanItem>[] }>(text);
-  const items = (out.items ?? [])
-    .filter((x) => x.topic)
-    .map((x) => ({ id: rid(), week: Math.max(1, Math.min(weeks, Number(x.week) || 1)), topic: String(x.topic).slice(0, 120), premise: String(x.premise ?? "").slice(0, 400), theme: x.theme ? String(x.theme).slice(0, 80) : undefined, use: true }));
-  if (!items.length) throw new Error("Couldn't make a plan. Try adding a few themes.");
-  return items;
 }

@@ -8,6 +8,7 @@ import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
 import { recover, runJob, useJob } from "@/lib/jobs";
 import { makeClass, runCheck, runResearch, runSlides, slideCount } from "@/lib/make";
+import { oneGate, stopMaking, Stopped } from "@/lib/makeQueue";
 import { applyFix, confirmClaim, restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
 import { caption } from "@/lib/museum";
 import { downloadPptx } from "@/lib/pptx";
@@ -717,6 +718,8 @@ export default function Prep() {
     return () => window.removeEventListener("pine:slide-selected", f);
   }, []);
   const makeJob = useJob(`make:${lessonId ?? "new"}`);
+  const [stopAsked, setStopAsked] = useState(false);
+  useEffect(() => { if (!makeJob.running) setStopAsked(false); }, [makeJob.running]);
   const history = useRef<Lesson[]>([]);
   const lastPush = useRef(0);
   const current = useRef<Lesson | null>(null);
@@ -850,7 +853,14 @@ export default function Prep() {
   // One click: research → slides → fact-check, in the background.
   function make(l: Lesson) {
     const upd = (fn: (x: Lesson) => Lesson) => updateLessons((cur) => cur.map((x) => (x.id === l.id ? fn(x) : x)));
-    runJob(`make:${l.id}`, (stage) => makeClass(l, courseName(l.courseId) || "", upd, stage));
+    const gate = oneGate(l.id);
+    runJob(`make:${l.id}`, async (stage) => {
+      try {
+        await makeClass(l, courseName(l.courseId) || "", upd, stage, gate);
+      } catch (e) {
+        if (!(e instanceof Stopped)) throw e; // stopping isn't an error; what was made is kept
+      }
+    });
   }
   useEffect(() => {
     if (ready && lesson && params.get("make") === "1" && !lesson.research && !makeJob.running) make(lesson);
@@ -896,7 +906,10 @@ export default function Prep() {
       </nav>
 
       {lesson && makeJob.running && (
-        <Working since={makeJob.started} what={makeJob.stage ? `Making your class — ${makeJob.stage}` : "Making your class"} doing="Researching, building slides with exhibits, then fact-checking. You can look around or work in another tab" usual="5–8 minutes" />
+        <div className="row" style={{ alignItems: "flex-start", gap: 18 }}>
+          <Working since={makeJob.started} what={makeJob.stage ? `Making your class — ${makeJob.stage}` : "Making your class"} doing="Researching, building slides with exhibits, then fact-checking. You can look around or work in another tab" usual="5–8 minutes" />
+          <button className="btn" onClick={() => { stopMaking(lesson.id); setStopAsked(true); }} disabled={stopAsked} title="Stops after the step that's running now; what's made so far is kept">{stopAsked ? "stopping after this step…" : "stop"}</button>
+        </div>
       )}
       {lesson && makeJob.error && <div className="err" style={{ marginBottom: 14 }}>{makeJob.error}</div>}
       {step === 1 && <Brief key={`brief-${lesson?.id ?? `new-${params.get("course") ?? ""}`}`} lesson={lesson} preset={params.get("course")} onSave={(b) => saveBrief(b)} onMake={(b) => { const l = saveBrief(b, 2); make(l); }} />}
