@@ -277,31 +277,43 @@ export default function Classes() {
   }, [params]);
 
   const lesson = lessons.find((l) => l.id === open);
-  if (lesson) return <ClassPage lesson={lesson} course={courseName(lesson.courseId)} back={() => { setOpen(null); router.replace("/classes"); }} />;
+  if (lesson) return <ClassPage lesson={lesson} course={courseName(lesson.courseId)} back={() => { setOpen(null); router.replace(`/classes?course=${lesson.courseId}`); }} />;
+  // A course chosen in the left-hand menu: show just that course and its classes.
+  const only = courses.find((c) => c.id === params.get("course"));
+  const shown = only ? [only] : courses;
   if (!ready) return <main className="page"><p className="mute">Loading…</p></main>;
 
   return (
     <main className="page">
       <div className="head">
-        <div>
-          <h1>Classes</h1>
-          <p>Your courses and their classes. Open a class to present it or download it. Drag a class up or down to change its order; right-click a name to rename it.</p>
-        </div>
-        <div className="row">
-          <button className="btn solid" onClick={() => setAdding(true)}>+ new course</button>
-        </div>
+        {only ? (
+          <div>
+            <Link className="linkish mute" href="/classes">← all courses</Link>
+            <p style={{ marginTop: 10 }}>Open a class to present it or download it. Drag a class up or down to change its order; right-click a name to rename it.</p>
+          </div>
+        ) : (
+          <div>
+            <h1>Classes</h1>
+            <p>Your courses and their classes — or pick a course in the menu to see just that one. Open a class to present it or download it. Drag a class up or down to change its order; right-click a name to rename it.</p>
+          </div>
+        )}
+        {!only && (
+          <div className="row">
+            <button className="btn solid" onClick={() => setAdding(true)}>+ new course</button>
+          </div>
+        )}
       </div>
 
       <QueueControls />
       {adding && (
-        <form className="card row" style={{ marginBottom: 28, maxWidth: 560 }} onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; updateCourses((cur) => [...cur, { id: Math.random().toString(36).slice(2, 10), name: name.trim() }]); setName(""); setAdding(false); }}>
+        <form className="card row" style={{ marginBottom: 28, maxWidth: 560 }} onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; const id = Math.random().toString(36).slice(2, 10); updateCourses((cur) => [...cur, { id, name: name.trim() }]); setName(""); setAdding(false); router.push(`/classes?course=${id}`); }}>
           <input className="input grow" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Course name, e.g. Art Appreciation 103" />
           <button className="btn solid">Add</button>
           <button type="button" className="btn ghost" onClick={() => setAdding(false)}>Cancel</button>
         </form>
       )}
 
-      {courses.map((c) => {
+      {shown.map((c) => {
         const ls = lessons.filter((l) => l.courseId === c.id).sort((a, b) => a.number - b.number);
         if (c.id === OTHER && !ls.length) return null;
         return (

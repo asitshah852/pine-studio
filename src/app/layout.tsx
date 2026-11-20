@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import Nav from "@/components/Nav";
 import "./globals.css";
@@ -25,7 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <div className="shell">
-          <Nav />
+          <Suspense>
+            <Nav />
+          </Suspense>
           <div className="main">{children}</div>
         </div>
       </body>

@@ -2,7 +2,7 @@
 // Left-hand menu in the style of Tanya's own site: name top left, lowercase links,
 // courses listed under "classes", the current page in grey.
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getPass, load, save, setPass, useStatus } from "@/lib/client";
 import { OTHER, useStudio } from "@/lib/studio";
@@ -20,8 +20,9 @@ const TABS = [
 
 export default function Nav() {
   const path = usePathname();
+  const params = useSearchParams();
   const st = useStatus();
-  const { courses, updateCourses } = useStudio();
+  const { courses, lessons, updateCourses } = useStudio();
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [dark, setDark] = useState(false);
@@ -45,6 +46,8 @@ export default function Nav() {
     document.documentElement.dataset.theme = next ? "dark" : "light";
   }
 
+  // The course being shown (?course=… or the course of an open class) is greyed like the current page.
+  const here = path === "/classes" ? params.get("course") || lessons.find((l) => l.id === params.get("open"))?.courseId || null : null;
   if (/^\/(handout|present|show|clip|quiz)(\/|$)/.test(path)) return null; // pages that stand on their own
   return (
     <aside className="side">
@@ -52,7 +55,7 @@ export default function Nav() {
       <nav aria-label="Sections">
         {TABS.map(([href, label]) => (
           <div key={href}>
-            <Link href={href} aria-current={(href === "/" ? path === "/" : path.startsWith(href)) ? "page" : undefined}>{label}</Link>
+            <Link href={href} aria-current={(href === "/" ? path === "/" : path.startsWith(href) && !(href === "/classes" && here)) ? "page" : undefined}>{label}</Link>
             {href === "/classes" && courses.filter((c) => c.id !== OTHER).length > 0 && (
               <div className="sub" title="Drag to reorder · right-click to rename">
                 {courses.filter((c) => c.id !== OTHER).map((c) => (
@@ -81,7 +84,7 @@ export default function Nav() {
                     }}
                     onDragEnd={() => { setDragId(null); setOverId(null); }}
                   >
-                    <Link href={`/classes#c-${c.id}`} draggable={false}>
+                    <Link href={`/classes?course=${c.id}`} draggable={false} aria-current={here === c.id ? "page" : undefined}>
                       <Renamable value={c.name} display={c.name.toLowerCase()} onSave={(name) => updateCourses((cur) => cur.map((x) => (x.id === c.id ? { ...x, name, example: false } : x)))} />
                     </Link>
                   </div>

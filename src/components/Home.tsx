@@ -105,7 +105,7 @@ export default function Home() {
           {courses.filter((c) => c.id !== OTHER).map((c) => {
             const ls = lessons.filter((l) => l.courseId === c.id);
             return (
-              <Link key={c.id} href={`/classes#c-${c.id}`} className="coursecard">
+              <Link key={c.id} href={`/classes?course=${c.id}`} className="coursecard">
                 <span className="serif">{c.name}</span>
                 <span className="mute">{ls.filter((l) => l.status === "ready").length} ready · {ls.filter((l) => l.status === "draft").length} in prep</span>
               </Link>
