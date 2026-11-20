@@ -3,38 +3,29 @@
 import Link from "next/link";
 import { useJob } from "@/lib/jobs";
 import { readiness } from "@/lib/slides";
-import { OTHER, pad, useStudio } from "@/lib/studio";
+import { pad, useStudio } from "@/lib/studio";
 import type { Lesson } from "@/lib/types";
 import SlideView from "./SlideView";
 
 function next(l: Lesson): { label: string; href: string } {
   const r = readiness(l);
-  if (l.status === "ready") return { label: "present it", href: `/classes?open=${l.id}` };
+  if (l.status === "ready") return { label: "open it", href: `/classes?open=${l.id}` };
   if (!l.research && !l.slides.length) return { label: "make my class", href: `/prep?lesson=${l.id}&make=1` };
   if (!l.slides.length) return { label: "make the slides", href: `/prep?lesson=${l.id}&step=3` };
   if (r.problems || r.unchecked) return { label: r.problems ? `fix ${r.problems} slide(s)` : "finish checking", href: `/prep?lesson=${l.id}&step=4` };
   return { label: "mark it ready for class", href: `/prep?lesson=${l.id}&step=4` };
 }
 
-function Status({ l }: { l: Lesson }) {
+/** Where a class stands, in a few words. */
+function where(l: Lesson): string {
   const r = readiness(l);
-  const cells: [string, boolean, string][] = [
-    ["brief", true, ""],
-    ["research", !!l.research, l.research ? "" : "to do"],
-    ["slides", l.slides.length > 0, l.slides.length ? `${l.slides.length}` : "to do"],
-    ["fact-checked", l.slides.length > 0 && !r.unchecked && !r.problems, r.problems ? `${r.problems} to fix` : r.unchecked ? `${r.unchecked} to check` : ""],
-    ["ready", l.status === "ready", ""],
-  ];
-  return (
-    <div className="statusrow">
-      {cells.map(([k, done, note]) => (
-        <span key={k} className={done ? "done" : ""}>
-          <span className="mark">{done ? "✓" : "○"}</span> {k}
-          {note && <span className="mute"> · {note}</span>}
-        </span>
-      ))}
-    </div>
-  );
+  const n = `${l.slides.length} slide${l.slides.length === 1 ? "" : "s"}`;
+  if (l.status === "ready") return "ready for class";
+  if (!l.research && !l.slides.length) return "not started";
+  if (!l.slides.length) return "researched · no slides yet";
+  if (r.problems) return `${n} · ${r.problems} to fix`;
+  if (r.unchecked) return `${n} · not all checked`;
+  return `${n} · not marked ready`;
 }
 
 export default function Home() {
@@ -49,22 +40,24 @@ export default function Home() {
 
   if (!ready) return <main className="page"><p className="mute">Loading…</p></main>;
 
+  // the rest of what's in prep, folded away by course
+  const byCourse = courses.map((c) => ({ c, ls: drafts.slice(1).filter((l) => l.courseId === c.id) })).filter((g) => g.ls.length);
+
   return (
-    <main className="page">
+    <main className="page home">
       <div className="mono mute">next up</div>
       {top ? (
         <section className="nextup">
           <div className="nextup-main">
             <div className="mono mute">{courseName(top.courseId)} · class {pad(top.number)}</div>
             <h1 className="serif">{top.topic}</h1>
-            {top.premise && <p className="lead mute">{top.premise}</p>}
-            <Status l={top} />
-            <div className="row" style={{ marginTop: 18 }}>
-              {makeJob.running ? <span className="mute">Being made now — {makeJob.stage || "starting"}…</span> : <Link className="btn solid" href={n!.href}>{n!.label} →</Link>}
-              <Link className="btn ghost" href={`/prep?lesson=${top.id}`}>open in prep</Link>
+            <p className="mute" style={{ margin: "0 0 18px" }}>{makeJob.running ? `being made now — ${makeJob.stage || "starting"}…` : where(top)}</p>
+            <div className="row">
+              {!makeJob.running && <Link className="btn solid" href={n!.href}>{n!.label} →</Link>}
+              <Link className="linkish" href={`/prep?lesson=${top.id}`}>open in prep</Link>
             </div>
           </div>
-          <div className="nextup-slide">{top.slides[0] ? <SlideView s={top.slides[0]} n={top.number} /> : <div className="slide"><div className="ph">no slides yet</div></div>}</div>
+          {top.slides[0] && <div className="nextup-slide"><SlideView s={top.slides[0]} n={top.number} /></div>}
         </section>
       ) : (
         <section className="nextup">
@@ -72,47 +65,29 @@ export default function Home() {
             <h1 className="serif">All your classes are ready.</h1>
             <div className="row" style={{ marginTop: 18 }}>
               <Link className="btn solid" href="/prep?new=1">prepare a new class →</Link>
-              <Link className="btn ghost" href="/classes">see your classes</Link>
             </div>
           </div>
         </section>
       )}
 
-      {drafts.length > 1 && (
-        <section style={{ marginTop: 46 }}>
-          <div className="mono mute" style={{ marginBottom: 8 }}>also in prep</div>
-          <div className="list">
-            {drafts.slice(1).map((l) => {
-              const x = next(l);
-              return (
-                <div key={l.id} className="item" style={{ gridTemplateColumns: "1fr auto" }}>
-                  <div>
-                    <div className="mono mute">{courseName(l.courseId)} · class {pad(l.number)}</div>
-                    <h3>{l.topic}</h3>
-                    <Status l={l} />
-                  </div>
-                  <Link className="btn" href={x.href}>{x.label} →</Link>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+      {byCourse.length > 0 && (
+        <details className="fold">
+          <summary>also in prep <span className="mute">({drafts.length - 1})</span></summary>
+          {byCourse.map(({ c, ls }) => (
+            <details key={c.id} className="fold inner" open={byCourse.length === 1}>
+              <summary>{c.name} <span className="mute">({ls.length})</span></summary>
+              <ul className="foldlist">
+                {ls.map((l) => (
+                  <li key={l.id}>
+                    <Link href={`/prep?lesson=${l.id}`}><span className="mute">{pad(l.number)}</span> {l.topic}</Link>
+                    <span className="mute">{where(l)}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))}
+        </details>
       )}
-
-      <section style={{ marginTop: 46 }}>
-        <div className="mono mute" style={{ marginBottom: 8 }}>your courses</div>
-        <div className="row" style={{ gap: 26 }}>
-          {courses.filter((c) => c.id !== OTHER).map((c) => {
-            const ls = lessons.filter((l) => l.courseId === c.id);
-            return (
-              <Link key={c.id} href={`/classes?course=${c.id}`} className="coursecard">
-                <span className="serif">{c.name}</span>
-                <span className="mute">{ls.filter((l) => l.status === "ready").length} ready · {ls.filter((l) => l.status === "draft").length} in prep</span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
     </main>
   );
 }
