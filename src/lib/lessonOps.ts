@@ -1,4 +1,5 @@
 // Replacing research, slides or a review always keeps the old one (last 5 of each) so it can be restored.
+import { normBody } from "./slideText";
 import { newId } from "./slides";
 import type { Claim, Lesson, ResearchDoc, ReviewDoc, Slide, Source, Version } from "./types";
 
@@ -53,9 +54,9 @@ export function applyOps(l: Lesson, ops: ChatOp[]): Lesson {
   let doc: RD | undefined = l.research;
   const touch = (id: string, fn: (s: Slide) => Slide) => (slides = slides.map((s) => (s.id === id ? { ...fn(s), check: undefined } : s)));
   for (const o of ops) {
-    if (o.op === "edit_slide") touch(o.slideId, (s) => ({ ...s, title: o.title ?? s.title, body: o.body ?? s.body, layout: o.layout ?? s.layout }));
+    if (o.op === "edit_slide") touch(o.slideId, (s) => { const layout = o.layout ?? s.layout; return { ...s, title: o.title ?? s.title, body: o.body !== undefined ? normBody(o.body, layout) : s.body, notes: o.notes ?? s.notes, layout }; });
     else if (o.op === "add_slide") {
-      const n = { ...blankSlide(o.layout ?? "text", o.title), body: o.body };
+      const n = { ...blankSlide(o.layout ?? "text", o.title), body: normBody(o.body, o.layout ?? "text"), notes: o.notes ?? "" };
       const i = o.afterId ? slides.findIndex((s) => s.id === o.afterId) : -1;
       slides = i >= 0 ? [...slides.slice(0, i + 1), n, ...slides.slice(i + 1)] : [...slides, n];
     } else if (o.op === "delete_slide") slides = slides.filter((s) => s.id !== o.slideId);

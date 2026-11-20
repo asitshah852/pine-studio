@@ -8,6 +8,7 @@ import { forget } from "./jobs";
 import { withCheck, withResearch, withSlides } from "./lessonOps";
 import { checkItems } from "./slides";
 import { caption } from "./museum";
+import { plainBody } from "./slideText";
 import type { Claim, Lesson, Quiz, ResearchDoc, Resource, Slide } from "./types";
 
 type Set = (fn: (l: Lesson) => Lesson) => void;
@@ -70,7 +71,7 @@ export async function makeClass(l: Lesson, course: string, set: Set, stage: (s: 
 export async function runQuiz(l: Lesson, course: string, set: Set, count = 5): Promise<Quiz> {
   const key = `quiz:${l.id}`;
   const paras = (l.research?.sections ?? []).flatMap((s) => s.paragraphs.map((p) => ({ heading: s.heading, text: p.text })));
-  const slides = l.slides.map((s) => ({ title: s.title, body: s.body, caption: s.artworks.map((a) => caption(a)).join("; ") }));
+  const slides = l.slides.map((s) => ({ title: s.title, body: [plainBody(s.body), s.notes].filter(Boolean).join("\n"), caption: s.artworks.map((a) => caption(a)).join("; ") }));
   const q = await apiJob<Quiz>("/api/quiz", { course, number: l.number, topic: l.topic, premise: l.premise, research: paras, questions: l.research?.questions ?? [], slides, count, jobKey: key });
   // "R3" / "S5" → words she can follow in the answer key
   const label = (f: string) => {

@@ -159,14 +159,15 @@ export default function Improve({ lesson, course, set, autoRun }: { lesson: Less
               {s.change && (
                 <div className="proposal">
                   {s.change.title && <div><span className="mute">title → </span>{s.change.title}</div>}
-                  {s.change.body && <div style={{ whiteSpace: "pre-wrap" }}><span className="mute">points → </span>{s.change.body}</div>}
-                  {s.change.notes && <div><span className="mute">notes → </span>{s.change.notes}</div>}
+                  {s.change.body && <div style={{ whiteSpace: "pre-wrap" }}><span className="mute">on the slide → </span>{s.change.body}</div>}
+                  {s.change.notes && <div><span className="mute">talking points → </span>{s.change.notes}</div>}
                 </div>
               )}
               {s.newSlide && (
                 <div className="proposal">
                   <span className="mute">new slide → </span><b style={{ fontWeight: 500 }}>{s.newSlide.title}</b>
                   {s.newSlide.body && <div style={{ whiteSpace: "pre-wrap" }}>{s.newSlide.body}</div>}
+                  {s.newSlide.notes && <div style={{ whiteSpace: "pre-wrap" }}><span className="mute">talking points → </span>{s.newSlide.notes}</div>}
                 </div>
               )}
               <div className="src">

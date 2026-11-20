@@ -40,8 +40,10 @@ export type Slide = {
   id: string;
   layout: "title" | "artwork" | "text" | "compare";
   title: string;
-  body: string; // bullet points, one per line
-  notes: string; // speaker notes
+  body: string; // the text ON the slide: one line each; "- " = bullet; **bold**, *italic* (lib/slideText.ts)
+  notes: string; // talking points: what she says while it's up (segue, context, how it fits) — presenter notes only
+  size?: number; // text size on the slide (1 = normal)
+  v?: 2; // slide format: 2 = on-slide text + talking points kept apart (older slides are upgraded in studio.ts)
   images: SlideImage[];
   artworks: Artwork[]; // museum records behind the images (the caption source)
   sources: Source[];
@@ -110,8 +112,8 @@ export type Version = {
 };
 
 export type ChatOp =
-  | { op: "edit_slide"; label: string; slideId: string; title?: string; body?: string; layout?: Slide["layout"] }
-  | { op: "add_slide"; label: string; afterId?: string; title: string; body: string; layout?: Slide["layout"] }
+  | { op: "edit_slide"; label: string; slideId: string; title?: string; body?: string; notes?: string; layout?: Slide["layout"] }
+  | { op: "add_slide"; label: string; afterId?: string; title: string; body: string; notes?: string; layout?: Slide["layout"] }
   | { op: "delete_slide"; label: string; slideId: string }
   | { op: "move_slide"; label: string; slideId: string; to: number }
   | { op: "edit_paragraph"; label: string; paragraphId: string; text: string }

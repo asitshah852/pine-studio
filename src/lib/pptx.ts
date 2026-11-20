@@ -4,6 +4,7 @@
 import { proxied } from "./client";
 import { caption } from "./museum";
 import { deckSources } from "./slides";
+import { parseBody, type Para } from "./slideText";
 import type { Lesson, SlideImage } from "./types";
 // (title is "Class N: topic")
 
@@ -45,6 +46,16 @@ const fit = (iw: number, ih: number, x: number, y: number, w: number, h: number)
   return { x: x + (w - fw) / 2, y: y + (h - fh) / 2, w: fw, h: fh };
 };
 
+// Slide text → pptxgenjs runs: one paragraph per line, bullets where marked, bold / italic kept.
+function rich(paras: Para[], bullets = true) {
+  return paras.flatMap((p, pi) =>
+    p.runs.map((r, ri) => ({
+      text: r.text,
+      options: { bold: r.b || undefined, italic: r.i || undefined, ...(ri === p.runs.length - 1 && pi < paras.length - 1 ? { breakLine: true } : {}), ...(ri === 0 && bullets && p.bullet ? { bullet: true } : {}) },
+    })),
+  );
+}
+
 export async function downloadPptx(lesson: Lesson) {
   const PptxGenJS = (await import("pptxgenjs")).default;
   const p = new PptxGenJS();
@@ -55,19 +66,20 @@ export async function downloadPptx(lesson: Lesson) {
   for (const s of lesson.slides) {
     const sl = p.addSlide();
     sl.background = { color: s.layout === "title" ? INK : "FFFFFF" };
-    const bullets = s.body.split("\n").map((t) => t.trim()).filter(Boolean);
+    const paras = parseBody(s.body);
+    const k = s.size ?? 1;
     const imgs = (await Promise.all(s.images.map(toData))).map((d, i) => (d ? { ...d, meta: s.images[i] } : null)).filter(Boolean) as {
       data: string; w: number; h: number; meta: SlideImage;
     }[];
 
     if (s.layout === "title") {
       sl.addText(s.title || lesson.topic, { x: 0.8, y: 2.6, w: W - 1.6, h: 1.4, fontFace: FONT, fontSize: 44, color: "FFFFFF" });
-      if (bullets.length) sl.addText(bullets.join("\n"), { x: 0.8, y: 4.1, w: W - 1.6, h: 1.2, fontFace: FONT, fontSize: 18, color: "BBBBBB" });
+      if (paras.length) sl.addText(rich(paras, false), { x: 0.8, y: 4.1, w: W - 1.6, h: 1.4, fontFace: FONT, fontSize: Math.round(18 * k), color: "BBBBBB", valign: "top" });
       sl.addText(`CLASS ${String(lesson.number).padStart(2, "0")}`, { x: 0.8, y: 0.6, w: 4, h: 0.4, fontFace: "Courier New", fontSize: 12, color: "BBBBBB", charSpacing: 4 });
     } else if (s.layout === "text" || !imgs.length) {
       sl.addText(s.title, { x: 0.8, y: 0.5, w: W - 1.6, h: 1, fontFace: FONT, fontSize: 32, color: INK, bold: true });
-      if (bullets.length)
-        sl.addText(bullets.map((t) => ({ text: t, options: { bullet: true } })), { x: 0.8, y: 1.7, w: W - 1.6, h: H - 2.4, fontFace: FONT, fontSize: 20, color: INK, valign: "top", paraSpaceAfter: 10 });
+      if (paras.length)
+        sl.addText(rich(paras), { x: 0.8, y: 1.7, w: W - 1.6, h: H - 2.4, fontFace: FONT, fontSize: Math.round(20 * k), color: INK, valign: "top", paraSpaceAfter: 10 });
     } else if (s.layout === "compare" && imgs.length >= 2) {
       sl.addText(s.title, { x: 0.6, y: 0.3, w: W - 1.2, h: 0.7, fontFace: FONT, fontSize: 26, color: INK, bold: true });
       const colW = (W - 1.8) / 2;
@@ -86,13 +98,13 @@ export async function downloadPptx(lesson: Lesson) {
       sl.addText(s.title, { x, y: 0.6, w, h: 1.2, fontFace: FONT, fontSize: 26, color: INK, bold: true, valign: "top" });
       const cap = s.artworks[0] ? caption(s.artworks[0]) : im.meta.credit;
       sl.addText(cap, { x, y: 1.9, w, h: 1.3, fontFace: FONT, fontSize: 11, color: MUTE, valign: "top" });
+      if (paras.length) sl.addText(rich(paras), { x, y: 3.4, w, h: H - 4, fontFace: FONT, fontSize: Math.round(15 * k), color: INK, valign: "top", paraSpaceAfter: 6 });
     }
     // A video slide always carries its link, even if the thumbnail couldn't be fetched.
     const v = s.artworks.find((x) => x.video)?.video;
     if (v && !imgs.length) sl.addText([{ text: "▶ Play on YouTube", options: { hyperlink: { url: `https://www.youtube.com/watch?v=${v.id}` } } }], { x: 0.8, y: H - 1, w: 5, h: 0.5, fontFace: FONT, fontSize: 16, color: INK });
-    // Talking points travel with every slide as presenter notes.
-    const talk = [bullets.map((b) => `• ${b}`).join("\n"), s.notes].filter(Boolean).join("\n\n");
-    if (talk) sl.addNotes(talk);
+    // Her talking points travel with every slide as presenter notes (never on the slide itself).
+    if (s.notes.trim()) sl.addNotes(s.notes.trim());
   }
 
   // Closing slide: every source and image credit, so the deck carries its own fact trail.

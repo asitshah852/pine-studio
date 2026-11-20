@@ -1,12 +1,13 @@
 // Slide building and fact-check state. Pure functions (tested in tests/slides.test.ts).
 import type { DragItem } from "./drag";
 import { caption } from "./museum";
+import { normBody, plainBody } from "./slideText";
 import type { Claim, Lesson, Slide, Source } from "./types";
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
 
 export function blankSlide(layout: Slide["layout"] = "text", title = ""): Slide {
-  return { id: newId(), layout, title, body: "", notes: "", images: [], artworks: [], sources: [] };
+  return { id: newId(), layout, title, body: "", notes: "", images: [], artworks: [], sources: [], v: 2 };
 }
 
 const addSources = (cur: Source[], more: Source[]) => {
@@ -40,7 +41,7 @@ export function addTo(slide: Slide, item: DragItem): Slide {
     if (s.layout === "text" || s.layout === "title") s.layout = "artwork";
     return s;
   }
-  s.body = [s.body.trim(), item.text.trim()].filter(Boolean).join("\n");
+  s.body = [s.body.trim(), normBody(item.text, s.layout === "text" ? "text" : "")].filter(Boolean).join("\n");
   s.sources = addSources(s.sources, item.sources);
   return s;
 }
@@ -50,7 +51,7 @@ export function checkItems(slides: Slide[]) {
   return slides
     .map((s) => ({
       id: s.id,
-      text: [s.title, s.body, s.notes && `Speaker notes: ${s.notes}`].filter(Boolean).join("\n"),
+      text: [s.title, plainBody(s.body), s.notes && `Talking points: ${s.notes}`].filter(Boolean).join("\n"),
       // Sources the slide already carries (from the research document and museum records).
       sources: s.sources.filter((x) => /^https?:/.test(x.url)).slice(0, 6),
     }))
@@ -96,7 +97,7 @@ export function applySuggestion(slides: Slide[], s: import("./types").Suggestion
         ? {
             ...x,
             title: s.change!.title ?? x.title,
-            body: s.change!.body ?? x.body,
+            body: s.change!.body !== undefined ? normBody(s.change!.body, x.layout) : x.body,
             notes: s.change!.notes ?? x.notes,
             sources: addSources(x.sources, s.sources),
             check: undefined,
@@ -105,7 +106,7 @@ export function applySuggestion(slides: Slide[], s: import("./types").Suggestion
     );
   }
   if (s.newSlide) {
-    const n: Slide = { ...blankSlide("text", s.newSlide.title), body: s.newSlide.body, notes: s.newSlide.notes, sources: s.sources };
+    const n: Slide = { ...blankSlide("text", s.newSlide.title), body: normBody(s.newSlide.body, "text"), notes: s.newSlide.notes, sources: s.sources };
     const i = s.slideId ? out.findIndex((x) => x.id === s.slideId) : -1;
     out = i >= 0 ? [...out.slice(0, i + 1), n, ...out.slice(i + 1)] : [...out, n];
   }
@@ -114,5 +115,5 @@ export function applySuggestion(slides: Slide[], s: import("./types").Suggestion
 
 /** A closing discussion slide from chosen questions. */
 export function discussionSlide(questions: string[]): Slide {
-  return { ...blankSlide("text", "Discuss"), body: questions.join("\n") };
+  return { ...blankSlide("text", "Discuss"), body: normBody(questions.join("\n"), "text") };
 }

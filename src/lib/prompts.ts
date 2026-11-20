@@ -1,6 +1,7 @@
 // The three Claude jobs: research a topic, pull points from her textbook, fact-check text.
 import { ask, groundSources, normUrl, parseJson } from "./claude";
 import { caption, findWork } from "./museum";
+import { normBody } from "./slideText";
 import type { Artwork, Claim, ExhibitSuggestion, PlanItem, Quiz, QuizQuestion, ResearchDoc, ReviewDoc, Slide, Source, Suggestion, TextbookPoint, Verdict } from "./types";
 
 const rid = () => Math.random().toString(36).slice(2, 10);
@@ -136,14 +137,16 @@ DISCUSSION QUESTIONS: ${input.doc.questions.join(" | ")}
 
 Structure: a title slide; content slides that follow the document's order; exhibit slides where the works fit; a closing "Discuss" slide with 2–3 of the questions.${input.minutes ? ` The class is ${input.minutes} minutes: include about one short in-class activity slide (slow looking, pair talk, quick sketch, vote) for every 25 minutes, spaced through the deck.` : ""}
 
-Each slide gets ONE set of talking points for her: 3–5 short bullets in plain, spoken language. On exhibit slides, the bullets connect the research to the work on screen — what to point out in it and why it matters for the topic (e.g. "Point to the flat, cut-out figures — that's the poster look MTV borrowed"). On text slides, they are the key ideas.
+Each slide has two kinds of text:
+1. "text" — what students SEE on the slide. Text slides: 2–5 short bullets (max 12 words each). Title slide: one short subtitle line. Artwork / compare slides: usually nothing (the work and its caption speak), or one short line.
+2. "talking" — what SHE SAYS while the slide is up; never shown on the slide. 2–4 short lines in her spoken voice: a segue in from the previous slide, the context students need, a question to put to the room, how it connects to what comes next. On exhibit slides, what to point out in the work and why it matters (e.g. "Point to the flat, cut-out figures — that's the poster look MTV borrowed"). Don't just repeat the slide text.
 
-Return ONLY JSON: { "slides": [ { "layout": "title | text | artwork | compare", "title": "short slide title", "talking": ["talking point, max 20 words"], "paragraphs": ["paragraph ids the facts came from"], "exhibits": ["exhibit ids shown on this slide"] } ] }
-Rules: no talking points on the title slide; artwork slides use exactly 1 exhibit, compare slides exactly 2.`,
+Return ONLY JSON: { "slides": [ { "layout": "title | text | artwork | compare", "title": "short slide title", "text": ["line on the slide"], "talking": ["what she says"], "paragraphs": ["paragraph ids the facts came from"], "exhibits": ["exhibit ids shown on this slide"] } ] }
+Rules: artwork slides use exactly 1 exhibit, compare slides exactly 2.`,
       },
     ],
   });
-  type RawSlide = { layout?: string; title?: string; talking?: string[]; points?: string[]; paragraphs?: string[]; exhibits?: string[] };
+  type RawSlide = { layout?: string; title?: string; text?: string[]; talking?: string[]; points?: string[]; paragraphs?: string[]; exhibits?: string[] };
   const raw = parseJson<{ slides?: RawSlide[] }>(text);
   const byPara = new Map(paras.map((p) => [p.id, p]));
   const byWork = new Map(works.map((w) => [w.id, w.match!]));
@@ -162,8 +165,9 @@ Rules: no talking points on the title slide; artwork slides use exactly 1 exhibi
       id: rid(),
       layout,
       title: String(r.title ?? ""),
-      body: (r.talking ?? r.points ?? []).filter((x) => typeof x === "string").join("\n"),
-      notes: "",
+      body: normBody((r.text ?? r.points ?? []).filter((x) => typeof x === "string").join("\n"), layout),
+      notes: (r.talking ?? []).filter((x) => typeof x === "string").join("\n"),
+      v: 2 as const,
       images: arts
         .map((a) =>
           a.imageUrl
@@ -309,8 +313,8 @@ Review it and return ONLY JSON (in a \`\`\`json block):
      "kind": "accuracy | content | discussion | exhibit | structure | clarity",
      "slide": "slide id it concerns, or empty",
      "text": "what to change and why, in plain language (1–3 sentences)",
-     "change": { "title": "new title or empty", "body": "new talking points (3–5 short bullets, one per line; on exhibit slides they link the research to the work) or empty" },   // only when proposing new wording for that slide
-     "newSlide": { "title": "...", "body": "talking points, one per line" },   // only when proposing an extra slide after that slide
+     "change": { "title": "new title or empty", "body": "new text ON the slide (short lines; '- ' for bullets) or empty", "notes": "new talking points — what she says while it's up (segue, context, a question, how it connects) or empty" },   // only when proposing new wording for that slide
+     "newSlide": { "title": "...", "body": "text on the slide, one line each", "notes": "talking points" },   // only when proposing an extra slide after that slide
      "sources": [ { "title": "...", "url": "exact URL you retrieved" } ]   // required for accuracy fixes and any new facts
   } ],   // 6–12 suggestions, most useful first; check her facts and flag anything wrong or outdated as "accuracy"
   "questions": [ "new discussion point or question for students" ],   // 4–6

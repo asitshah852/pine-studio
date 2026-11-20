@@ -22,8 +22,8 @@ const TOOLS: B[] = [
   { type: "web_search_20260209", name: "web_search", max_uses: 5 },
   tool("find_exhibits", "Find exhibits: art in the Art Institute of Chicago, The Met and the Cleveland Museum of Art; historic photographs, posters and prints in the Library of Congress; or videos on YouTube (official channels only — use sparingly, each search uses part of a small daily allowance). Returns items with a ref to use in add_exhibit.", { query: { ...str, description: "artist, title, movement or subject — or a YouTube video link" }, source: { type: "string", enum: ["all", "museums", "library_of_congress", "youtube"], description: "all = museums + Library of Congress" } }, ["query", "source"]),
   tool("add_exhibit", "Add a work found with find_exhibits to the class's exhibit list, and optionally put it on a slide.", { ref: str, why: { ...str, description: "one sentence: why it fits this class" }, slide_id: { ...str, description: "slide to place it on, or empty" } }, ["ref", "why", "slide_id"]),
-  tool("edit_slide", "Change a slide's title, talking points (3–5 short bullets, one per line) or layout. Leave a field empty to keep it.", { slide_id: str, title: str, talking_points: str, layout: { ...layout, description: "or empty" } }, ["slide_id", "title", "talking_points", "layout"]),
-  tool("add_slide", "Add a new slide after the given slide (empty = at the end).", { after_slide_id: str, title: str, talking_points: str, layout }, ["after_slide_id", "title", "talking_points", "layout"]),
+  tool("edit_slide", "Change a slide's title, the text shown ON the slide, her talking points (what she says while it's up, not shown) or layout. Leave a field empty to keep it.", { slide_id: str, title: str, slide_text: { type: "string", description: "text on the slide, one line each; start a line with '- ' for a bullet; **bold** allowed" }, talking_points: { type: "string", description: "what she says while the slide is up: a segue in, context, a question to ask, how it connects — short lines" }, layout: { ...layout, description: "or empty" } }, ["slide_id", "title", "slide_text", "talking_points", "layout"]),
+  tool("add_slide", "Add a new slide after the given slide (empty = at the end).", { after_slide_id: str, title: str, slide_text: str, talking_points: str, layout }, ["after_slide_id", "title", "slide_text", "talking_points", "layout"]),
   tool("delete_slide", "Delete a slide.", { slide_id: str }, ["slide_id"]),
   tool("move_slide", "Move a slide to a new position (1 = first).", { slide_id: str, position: { type: "integer" } }, ["slide_id", "position"]),
   tool("edit_research_paragraph", "Rewrite a paragraph of the research document (keep its facts unless correcting them).", { paragraph_id: str, text: str }, ["paragraph_id", "text"]),
@@ -47,7 +47,7 @@ You are now talking with Tanya inside her prep tool about one class. Be a warm, 
 - Facts in your replies or in anything you add must come from web_search results in this conversation; cite them. If you can't source something, say so.
 - If YouTube search is switched off, ask her to paste the video's YouTube link; find_exhibits with that link as the query works without the key.
 - Exhibits only come from find_exhibits (real museum, Library of Congress or YouTube records). Never invent a work, record or video. For YouTube, prefer official artist, label or museum channels and say which channel it is.
-- Talking points: 3–5 short bullets in plain spoken language; on exhibit slides they link the research to the work on screen.
+- Each slide has two kinds of text. Slide text = what students see (short; bullets on text slides; usually nothing on picture slides besides the caption). Talking points = what she says while it's up, never shown: a segue from the slide before, the context students need, a question to put to the room, how it connects to the next idea; on exhibit slides, what to point out in the work. Write talking points as 2–5 short lines in her spoken voice.
 - Refer to slides by their number, not their id.
 - She can run the whole deck through you. "Finish up" / "wrap it up" / "I'm done" → finish_class (unconfirmed facts don't stop it). "Check it" → fact_check_slides. "Show me slide N" → show_slide. "Start the slides over" → remake_slides. Long jobs run after your reply; say they've started.`;
 
@@ -60,7 +60,7 @@ function snapshot(l: Lesson, course: string): string {
     : "(no research document yet)";
   const slides = l.slides.length
     ? l.slides
-        .map((s, i) => `Slide ${i + 1} [id:${s.id}] (${s.layout}) ${s.title}${s.artworks.length ? ` — shows: ${s.artworks.map((a) => a.title).join(", ")}` : ""}\n${s.body}`)
+        .map((s, i) => `Slide ${i + 1} [id:${s.id}] (${s.layout}) ${s.title}${s.artworks.length ? ` — shows: ${s.artworks.map((a) => a.title).join(", ")}` : ""}${s.body ? `\nOn slide: ${s.body}` : ""}${s.notes ? `\nTalking points: ${s.notes}` : ""}`)
         .join("\n\n")
     : "(no slides yet)";
   return `CLASS: ${course} · Class ${l.number}: ${l.topic}\nPremise: ${l.premise || "(none)"}\n\nRESEARCH DOCUMENT:\n${doc}\n\nSLIDES:\n${slides}`;
@@ -147,14 +147,14 @@ export async function chat(input: { lesson: Lesson; course: string; history: { r
             const id = s(a.slide_id);
             if (!slideIds.has(id)) { bad("Unknown slide id."); break; }
             const lay = s(a.layout) as "title" | "text" | "artwork" | "compare" | "";
-            ops.push({ op: "edit_slide", label: `Edited slide ${pos(id)}`, slideId: id, title: s(a.title) || undefined, body: s(a.talking_points) || undefined, layout: lay || undefined });
+            ops.push({ op: "edit_slide", label: `Edited slide ${pos(id)}`, slideId: id, title: s(a.title) || undefined, body: s(a.slide_text) || undefined, notes: s(a.talking_points) || undefined, layout: lay || undefined });
             ok("Done.");
             break;
           }
           case "add_slide": {
             const after = s(a.after_slide_id);
             const lay = (s(a.layout) || "text") as "title" | "text" | "artwork" | "compare";
-            ops.push({ op: "add_slide", label: `Added a slide: ${s(a.title)}`, afterId: slideIds.has(after) ? after : undefined, title: s(a.title), body: s(a.talking_points), layout: lay });
+            ops.push({ op: "add_slide", label: `Added a slide: ${s(a.title)}`, afterId: slideIds.has(after) ? after : undefined, title: s(a.title), body: s(a.slide_text), notes: s(a.talking_points), layout: lay });
             ok("Done.");
             break;
           }

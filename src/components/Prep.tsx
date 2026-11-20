@@ -444,23 +444,31 @@ function SlidesStep({ lesson, course, set, resources, initial }: { lesson: Lesso
   };
   const editorBody = slide ? (
     <>
+            <div className="fmtbar" role="toolbar" aria-label="Slide text formatting" onMouseDown={(e) => e.preventDefault()}>
+              <button title="Bold (⌘B)" onClick={() => document.execCommand("bold")}><b>B</b></button>
+              <button title="Italic (⌘I)" onClick={() => document.execCommand("italic")}><i>I</i></button>
+              <button title="Bullets on / off" onClick={() => document.execCommand("insertUnorderedList")}>• list</button>
+              <span className="sep" />
+              <button title="Smaller text" onClick={() => edit({ size: Math.max(0.6, +((slide.size ?? 1) - 0.1).toFixed(2)) })}>A−</button>
+              <button title="Larger text" onClick={() => edit({ size: Math.min(1.8, +((slide.size ?? 1) + 0.1).toFixed(2)) })}>A+</button>
+              <span className="hint">click the title or text on the slide to type</span>
+            </div>
             <SlideView
               s={slide}
               n={lesson.number}
               edit={{
                 onTitle: (t) => edit({ title: t }),
+                onBody: (b) => edit({ body: b }),
                 onRemoveImage: (i) => setSlide(slide.id, (x) => ({ ...x, images: x.images.filter((_, j) => j !== i), artworks: x.artworks.filter((a) => caption(a) !== x.images[i]?.credit), check: undefined })),
               }}
             />
             <div className="stack" style={{ marginTop: 14 }}>
               <div>
-                <label className="label mono">talking points — a few bullets, one per line{slide.artworks.length ? ", linking the research to this work" : ""}</label>
-                <textarea className="area" rows={5} value={slide.body} onChange={(e) => edit({ body: e.target.value })} />
-                <div className="mute" style={{ fontSize: 16, marginTop: 4 }}>{slide.layout === "text" ? "Shown on the slide and in your presenter notes." : slide.layout === "title" ? "Shown under the title." : "In your presenter notes; the slide shows just the work and its caption."}</div>
+                <label className="label mono">talking points — what you’ll say while this slide is up (not shown on the slide)</label>
+                <textarea className="area talkpts" rows={4} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })}
+                  placeholder="A way in from the last slide, the context students need, a question to ask, how this connects to the next idea…" />
+                <div className="mute" style={{ fontSize: 16, marginTop: 4 }}>In your presenter view and PowerPoint notes. Or ask the chat: “write talking points for this slide”.</div>
               </div>
-              {slide.notes && (
-                <div><label className="label mono">notes from your deck</label><textarea className="area" rows={3} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })} /></div>
-              )}
               {slide.check && slide.check.claims.length > 0 && (
                 <Claims claims={slide.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, slide.id, ci, ok))} onUseFix={(ci) => takeFix(slide.id, ci)} />
               )}

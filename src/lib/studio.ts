@@ -3,15 +3,22 @@
 import { useMemo } from "react";
 import { useCollection } from "./client";
 import { SEED_COURSES, SEED_LESSONS } from "./seed";
+import { normBody } from "./slideText";
 import type { Course, Lesson } from "./types";
 
 export const OTHER = "__other";
 
 export function upgrade(l: Lesson): Lesson {
   const deck = (l.materials ?? []).some((m) => m.kind === "pptx");
-  const slides = (l.slides ?? []).map((s) =>
-    s.notes && !s.fromDeck && !deck ? { ...s, body: s.body.trim() ? s.body : s.notes, notes: "" } : s,
-  );
+  // Format 2 (Nov 2026): the slide's own text and her talking points are separate. On older picture
+  // slides the text box held talking points (never shown on the slide), so it moves to talking points.
+  const slides = (l.slides ?? []).map((s) => {
+    if (s.v === 2) return s;
+    const pic = (s.layout === "artwork" || s.layout === "compare") && !s.fromDeck && !deck;
+    return pic
+      ? { ...s, notes: [s.notes, s.body].map((t) => t?.trim()).filter(Boolean).join("\n"), body: "", v: 2 as const }
+      : { ...s, body: normBody(s.body ?? "", s.layout), v: 2 as const };
+  });
   return {
     ...l,
     slides,

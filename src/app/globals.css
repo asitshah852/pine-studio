@@ -113,24 +113,29 @@ h3 { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
 /* ── slide (16:9) ── */
 .slide { position: relative; aspect-ratio: 16 / 9; background: #fff; color: #111; overflow: hidden; container-type: inline-size; border: 1px solid var(--line); }
 .slide.title { background: #111; color: #fff; }
-.slide .st { position: absolute; left: 6%; right: 6%; top: 7%; font-family: var(--sans); font-weight: 600; font-size: 4cqw; line-height: 1.1; }
-.slide.title .st { top: 38%; font-family: var(--serif); font-weight: 400; font-size: 6.4cqw; }
-.slide .sb { position: absolute; left: 6%; right: 6%; top: 22%; font-size: 2.1cqw; line-height: 1.45; }
-.slide.title .sb { top: 58%; color: #bbb; }
+/* text column: title, (caption), slide text — in normal flow so nothing overlaps */
+.slide .sx { position: absolute; left: 6%; right: 6%; top: 7%; bottom: 6%; display: flex; flex-direction: column; gap: 2.6cqw; overflow: hidden; }
+.slide.title .sx { top: 16%; bottom: 10%; justify-content: center; gap: 2cqw; }
+.slide .st { font-family: var(--sans); font-weight: 600; font-size: 4cqw; line-height: 1.12; flex: none; }
+.slide.title .st { font-family: var(--serif); font-weight: 400; font-size: 6.4cqw; }
+.slide .sb { font-size: calc(2.1cqw * var(--k, 1)); line-height: 1.45; min-height: 1em; }
+.slide.title .sb { color: #bbb; font-size: calc(2cqw * var(--k, 1)); }
 .slide .sb ul { margin: 0; padding-left: 1.2em; }
-.slide .sb li + li { margin-top: 0.4em; }
+.slide .sb li + li, .slide .sb p + p, .slide .sb ul + p, .slide .sb p + ul { margin-top: 0.4em; }
+.slide .sb p { margin: 0; }
 .slide .tag { position: absolute; left: 6%; top: 8%; font-family: var(--mono); font-size: 1.3cqw; letter-spacing: 0.3em; color: #aaa; }
 .slide .si { position: absolute; left: 3.5%; top: 6%; width: 55%; height: 88%; display: flex; align-items: center; justify-content: center; }
 .slide .si img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.slide.artwork .st { left: 63%; right: 4%; top: 8%; font-size: 2.8cqw; }
-.slide.artwork .cap { position: absolute; left: 63%; right: 4%; top: 26%; font-size: 1.15cqw; color: #666; line-height: 1.4; }
-.slide.artwork .sb { left: 63%; right: 4%; top: 46%; font-size: 1.6cqw; }
+.slide.artwork .sx { left: 63%; right: 4%; top: 8%; gap: 1.6cqw; }
+.slide.artwork .st { font-size: 2.8cqw; }
+.slide.artwork .cap { font-size: 1.15cqw; color: #666; line-height: 1.4; }
+.slide.artwork .sb { font-size: calc(1.6cqw * var(--k, 1)); }
+.slide.compare .st { position: absolute; left: 4%; right: 4%; top: 5%; font-size: 2.8cqw; }
 .slide .pair { position: absolute; left: 4%; right: 4%; top: 17%; bottom: 4%; display: grid; grid-template-columns: 1fr 1fr; gap: 4%; }
 .slide .pair > div { display: flex; flex-direction: column; min-height: 0; }
 .slide .pair .im { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .slide .pair img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .slide .pair .cap { font-size: 1cqw; color: #666; margin-top: 0.8cqw; line-height: 1.35; }
-.slide.compare .st { font-size: 2.8cqw; top: 5%; }
 .slide .ph { color: #999; font-family: var(--mono); font-size: 1.2cqw; letter-spacing: 0.1em; border: 1px dashed #ccc; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 8px; }
 
 /* ── present mode ── */
@@ -614,8 +619,7 @@ body.slidesfocus .page { max-width: none; padding-left: 28px; }
 .pclock .left { font-size: 18px; color: #a3a3a0; }
 .pclock .left.over { color: #e0574e; }
 .plabel { font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; color: #8c8c89; margin-bottom: 6px; }
-.ppoints ul { margin: 0; padding-left: 1.1em; font-size: 24px; line-height: 1.45; }
-.ppoints li + li { margin-top: 8px; }
+.ppoints p { margin: 0 0 10px; font-size: 24px; line-height: 1.45; }
 .pmute { color: #a3a3a0; font-size: 18px; }
 .pnextbtn { background: none; border: 0; padding: 0; width: 100%; cursor: pointer; opacity: 0.8; }
 .pnextbtn .slide { border: 0; pointer-events: none; }
@@ -667,3 +671,16 @@ body.slidesfocus .page { max-width: none; padding-left: 28px; }
 .clipbtn { display: inline-block; border: 1px solid var(--ink); padding: 3px 12px; text-decoration: none; color: var(--ink); cursor: grab; margin-left: 6px; }
 .clipsetup .steps-list { font-size: 19px; line-height: 1.6; max-width: 720px; }
 .clipsetup .steps-list li { margin-bottom: 10px; }
+/* on-slide text editing */
+.slide.editable .sbedit { outline: none; cursor: text; border-radius: 2px; flex: 1; min-height: 3em; }
+.slide.editable .sbedit:hover { box-shadow: 0 0 0 1px rgba(127,127,127,0.5); }
+.slide.editable .sbedit:focus { box-shadow: 0 0 0 1px #888; }
+.slide.editable .sbedit:empty::before { content: attr(data-placeholder); color: #aaa; }
+.slide.editable .sbedit div { margin: 0; }
+.slide.editable .sbedit div + div, .slide.editable .sbedit ul + div, .slide.editable .sbedit div + ul { margin-top: 0.4em; }
+.fmtbar { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+.fmtbar button { background: none; border: 1px solid transparent; color: var(--ink); font: inherit; font-size: 18px; min-width: 36px; height: 34px; padding: 0 8px; cursor: pointer; }
+.fmtbar button:hover { border-color: var(--line); }
+.fmtbar .sep { width: 1px; height: 22px; background: var(--line); margin: 0 6px; }
+.fmtbar .hint { color: var(--mute); font-size: 15px; margin-left: 8px; }
+.talkpts { width: 100%; min-height: 110px; }

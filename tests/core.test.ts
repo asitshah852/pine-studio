@@ -244,3 +244,33 @@ test("clipping an ordinary page isn't mistaken for a museum object", async () =>
   assert.equal(await fromMuseumLink("https://www.artic.edu/exhibitions"), null);
   assert.equal(await fromMuseumLink("not a link"), null);
 });
+
+test("slide text: bullets, paragraphs, bold and italic survive the on-slide editor", async () => {
+  const { parseBody, normBody, toHtml, fromHtml, plainBody } = await import("../src/lib/slideText");
+  const body = "Intro line with **bold** and *italic*\n- First point\n- Second point";
+  const p = parseBody(body);
+  assert.deepEqual(p.map((x) => x.bullet), [false, true, true]);
+  assert.deepEqual(p[0].runs, [{ text: "Intro line with " }, { text: "bold", b: true }, { text: " and " }, { text: "italic", i: true }]);
+  assert.equal(plainBody(body), "Intro line with bold and italic\nFirst point\nSecond point");
+  assert.equal(normBody("One\nTwo", "text"), "- One\n- Two");
+  assert.equal(normBody("One\n- Two", "text"), "One\n- Two");
+  assert.equal(normBody("Subtitle", "title"), "Subtitle");
+  // a tiny DOM stand-in for what the browser's editor produces
+  const el = (name: string, kids: unknown[], style = "") => ({ nodeType: 1, nodeName: name, textContent: null, childNodes: kids, getAttribute: () => style });
+  const t = (x: string) => ({ nodeType: 3, nodeName: "#text", textContent: x, childNodes: [] });
+  const dom = el("DIV", [el("DIV", [t("Intro line with "), el("B", [t("bold")]), t(" and "), el("I", [t("italic")])]), el("UL", [el("LI", [t("First point")]), el("LI", [t("Second point")])])]);
+  assert.equal(fromHtml(dom as never), body);
+  assert.match(toHtml(body), /^<div>Intro line with <b>bold<\/b> and <i>italic<\/i><\/div><ul><li>First point<\/li><li>Second point<\/li><\/ul>$/);
+});
+
+test("older slides: picture-slide talking points move off the slide; text slides keep their bullets", async () => {
+  const { upgrade } = await import("../src/lib/studio");
+  const l = { id: "x", courseId: "c", number: 1, topic: "t", premise: "", readings: [], status: "draft", slides: [
+    { id: "a", layout: "artwork", title: "Work", body: "Point to the light\nNotice the brush", notes: "", images: [], artworks: [], sources: [] },
+    { id: "b", layout: "text", title: "Ideas", body: "One\nTwo", notes: "", images: [], artworks: [], sources: [] },
+  ] } as unknown as Lesson;
+  const [a, b] = upgrade(l).slides;
+  assert.equal(a.body, ""); assert.equal(a.notes, "Point to the light\nNotice the brush");
+  assert.equal(b.body, "- One\n- Two"); assert.equal(b.v, 2);
+  assert.deepEqual(upgrade({ ...l, slides: [a, b] }).slides, [a, b]);
+});

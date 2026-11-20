@@ -55,7 +55,7 @@ export default function Presenter({ id }: { id: string }) {
 
   const s = l.slides[i];
   const next = l.slides[i + 1];
-  const points = s.body.split("\n").map((t) => t.trim()).filter(Boolean);
+  const points = s.notes.split("\n").map((t) => t.replace(/^\s*[-•*]\s+/, "").trim()).filter(Boolean);
   const target = (l.minutes ?? 0) * 60;
   const left = target ? target - secs : 0;
 
@@ -88,8 +88,7 @@ export default function Presenter({ id }: { id: string }) {
           </div>
           <div className="ppoints">
             <div className="plabel">talking points</div>
-            {points.length ? <ul>{points.map((p, k) => <li key={k}>{p}</li>)}</ul> : <p className="pmute">None for this slide.</p>}
-            {s.notes && <p className="pmute">{s.notes}</p>}
+            {points.length ? points.map((p, k) => <p key={k}>{p}</p>) : <p className="pmute">None for this slide — add them under the slide in Prep.</p>}
           </div>
           <div className="pnext">
             <div className="plabel">next</div>

@@ -14,6 +14,7 @@ const STARTERS = [
   "What's missing from this class?",
   "Finish up",
   "Find two works in Chicago collections I could compare on one slide",
+  "Write talking points for every slide that doesn't have them",
   "Make the talking points simpler for 19-year-olds",
   "Add a slide with a quick in-class activity",
 ];
