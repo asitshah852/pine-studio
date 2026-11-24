@@ -490,3 +490,52 @@ Return ONLY JSON (in a \`\`\`json block):
   if (!questions.length) throw new Error("Couldn't write questions from this class's material. Make the research or slides first.");
   return { at: new Date().toISOString(), questions, exit: (out.exit ?? []).map(String).filter(Boolean).slice(0, 3) };
 }
+
+/** Talking points for slides that have none (imported decks, older slides): what she might SAY while
+ *  each slide is up. Written only from the slide, its captions, her own deck notes and the class notes —
+ *  any line that brings in a number, quotation or name not found there is dropped. */
+export async function talkingPoints(input: {
+  topic: string;
+  course: string;
+  notes: string[]; // class notes paragraphs (may be empty)
+  slides: { id: string; title: string; text: string; caption: string; talking: string }[];
+  want: string[]; // slide ids to write for
+}): Promise<{ id: string; talking: string }[]> {
+  const deck = input.slides
+    .map((s, i) => `[${s.id}] Slide ${i + 1}${input.want.includes(s.id) ? " (WRITE FOR THIS ONE)" : ""}: ${s.title}${s.caption ? `\nPicture: ${s.caption}` : ""}${s.text ? `\nOn the slide: ${s.text}` : ""}${s.talking ? `\nHer talking points already: ${s.talking}` : ""}`)
+    .join("\n\n")
+    .slice(0, 60_000);
+  const { text } = await ask({
+    system: `You help Tanya, who teaches undergraduate ${input.course || "Art Appreciation"} in Chicago, get ready to present. Talking points are what she SAYS while a slide is up — never shown to students.
+Rules you never break:
+- Use only what is on the slides, in the picture captions and in her class notes below. Add no new fact, date, name, number or quotation.
+- 2–4 short lines per slide, in her spoken voice: a way in from the slide before, the point to make or what to look at in the picture, a question to put to the room, a link to what comes next. Don't just read the slide back.
+- Plain, warm, a little wry; for 19–20-year-olds.`,
+    effort: "low",
+    content: [
+      {
+        type: "text",
+        text: `Class: "${input.topic}".
+
+CLASS NOTES:
+${input.notes.join("\n").slice(0, 30_000) || "(none — use the slides only)"}
+
+SLIDES:
+${deck}
+
+Write talking points for each slide marked WRITE FOR THIS ONE. Return ONLY JSON (in a \`\`\`json block): { "slides": [ { "id": "slide id", "talking": ["line", "line"] } ] }`,
+      },
+    ],
+  });
+  const out = parseJson<{ slides?: { id?: string; talking?: string[] }[] }>(text);
+  const notes = input.notes.join("\n");
+  return (out.slides ?? [])
+    .filter((x) => x.id && input.want.includes(x.id))
+    .map((x) => {
+      const s = input.slides.find((y) => y.id === x.id)!;
+      const known = [s.title, s.text, s.caption, s.talking, notes].join("\n");
+      const lines = (x.talking ?? []).map((l) => String(l).trim()).filter((l) => l && keepsFacts(known, l));
+      return { id: x.id!, talking: lines.join("\n") };
+    })
+    .filter((x) => x.talking);
+}

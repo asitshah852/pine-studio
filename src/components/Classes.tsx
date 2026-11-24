@@ -6,21 +6,45 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useCollection } from "@/lib/client";
 import { downloadDocx } from "@/lib/docx";
+import { recover, useJob } from "@/lib/jobs";
+import { runTalking } from "@/lib/make";
 import { caption } from "@/lib/museum";
 import { downloadPptx } from "@/lib/pptx";
 import { deckSources } from "@/lib/slides";
 import { STARTER_RESOURCES } from "@/lib/starter";
 import { OTHER, pad, useStudio } from "@/lib/studio";
-import { ACCEPT } from "@/lib/importers";
 import { uid } from "@/lib/client";
 import type { Lesson, Resource } from "@/lib/types";
-import { importAll } from "./Improve";
 import Renamable from "./Renamable";
 import Inline from "./Inline";
 import Working from "./Working";
 import QuizBox from "./QuizBox";
 import Planner, { QueueControls } from "./Planner";
+import FolderImport from "./FolderImport";
 import SlideView from "./SlideView";
+
+/** Imported or older slides without talking points: one click drafts them (she edits them after). */
+function TalkAll({ lesson, set }: { lesson: Lesson; set: (fn: (l: Lesson) => Lesson) => void }) {
+  const job = useJob(`talk:${lesson.id}`);
+  const missing = lesson.slides.filter((s) => !s.notes.trim()).length;
+  useEffect(() => {
+    recover(`talk:${lesson.id}`, (d) => {
+      const got = new Map(((d as { slides: { id: string; talking: string }[] }).slides ?? []).map((x) => [x.id, x.talking]));
+      set((l) => ({ ...l, slides: l.slides.map((x) => (got.has(x.id) && !x.notes.trim() ? { ...x, notes: got.get(x.id)! } : x)) }));
+    });
+  }, [lesson.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!missing && !job.running) return null;
+  return (
+    <div className="row" style={{ margin: "-8px 0 18px" }}>
+      {job.running ? (
+        <Working since={job.started} what="Writing talking points" doing="Drafting what you might say on each slide, from the slides and your notes only" usual="about a minute" />
+      ) : (
+        <button className="linkish" onClick={() => job.run(async () => { await runTalking(lesson, set); })}>write talking points for {missing} slide{missing === 1 ? "" : "s"} without them</button>
+      )}
+      {job.error && <span className="err">{job.error}</span>}
+    </div>
+  );
+}
 
 function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; back: () => void }) {
   const { updateLessons } = useStudio();
@@ -42,6 +66,7 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
           <p><Inline multiline value={lesson.premise} onSave={(premise) => setLesson((l) => ({ ...l, premise }))} placeholder="Click to add a short summary of this class" /></p>
         </div>
         <div className="row">
+          {lesson.slides.length > 0 && <Link className="btn solid" href={`/present/${lesson.id}`} title="Your laptop shows the slide, your talking points, the next slide and a clock; “open audience window” puts just the slide on the projector">present</Link>}
           <button className="btn" disabled={busy || !lesson.slides.length} onClick={async () => { setBusy(true); try { await downloadPptx(lesson); } finally { setBusy(false); } }}>{busy ? "Building…" : "PowerPoint ↓"}</button>
           {doc && <button className="btn" onClick={() => downloadDocx(lesson, course)}>notes ↓</button>}
           <a className="btn" href={`/handout/${lesson.id}`} target="_blank" rel="noreferrer">Handout ↓</a>
@@ -51,6 +76,7 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
         </div>
       </div>
       <QuizBox lesson={lesson} course={course} set={setLesson} />
+      <TalkAll lesson={lesson} set={setLesson} />
       <nav className="steps" style={{ marginBottom: 22 }}>
         {(["slides", "document", ...((lesson.materials?.length ?? 0) ? (["materials"] as const) : []), "sources"] as const).map((t) => (
           <button key={t} className="stepb" aria-current={tab === t ? "step" : undefined} onClick={() => setTab(t)}>
@@ -75,9 +101,10 @@ function ClassPage({ lesson, course, back }: { lesson: Lesson; course: string; b
                 <div>
                   <div className="mono mute">{pad(i + 1)}</div>
                   <h3 style={{ fontSize: 17, fontWeight: 500 }}>{s.title || "Untitled"}</h3>
-                  {s.notes.trim() ? (
-                    <><div className="mono mute small" style={{ marginTop: 6 }}>talking points</div><p style={{ margin: "2px 0 0", whiteSpace: "pre-wrap" }}>{s.notes}</p></>
-                  ) : <p className="mute" style={{ margin: "6px 0 0" }}>No talking points yet.</p>}
+                  <div className="mono mute small" style={{ marginTop: 6 }}>talking points</div>
+                  <p style={{ margin: "2px 0 0" }}>
+                    <Inline multiline value={s.notes} placeholder="Click to add talking points" onSave={(notes) => setLesson((l) => ({ ...l, slides: l.slides.map((x) => (x.id === s.id ? { ...x, notes } : x)) }))} />
+                  </p>
                 </div>
               </div>
             ))}
@@ -139,7 +166,7 @@ export default function Classes() {
   const [open, setOpen] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const [existing, setExisting] = useState<string | null>(null); // course id with the "existing class" form open
+  const [existing, setExisting] = useState<string | null>(null); // course id with the "import classes" panel open
   const [dragL, setDragL] = useState<string | null>(null);
   const [overL, setOverL] = useState<string | null>(null);
   const [copyFor, setCopyFor] = useState<string | null>(null);
@@ -177,36 +204,6 @@ export default function Classes() {
       return [...cur, copy];
     });
   }
-  const [ex, setEx] = useState<{ number: number; topic: string; files: File[] }>({ number: 1, topic: "", files: [] });
-  const [progress, setProgress] = useState("");
-  const [exErr, setExErr] = useState("");
-
-  async function addExisting(courseId: string) {
-    setExErr("");
-    const r = await importAll(ex.files, setProgress);
-    setProgress("");
-    if (r.errors.length && !r.slides.length && !r.materials.length) return setExErr(r.errors.join(" "));
-    const firstTitle = r.slides.find((x) => x.title)?.title ?? "";
-    const l = {
-      id: uid(),
-      courseId,
-      number: ex.number,
-      topic: ex.topic.trim() || firstTitle || ex.files[0]?.name.replace(/\.[^.]+$/, "") || "Untitled class",
-      premise: "",
-      readings: [],
-      slides: r.slides,
-      materials: r.materials,
-      status: "ready" as const,
-      readyAt: new Date().toISOString(),
-    };
-    updateLessons((cur) => [...cur, l]);
-    if (r.errors.length) alert(r.errors.join("\n"));
-    setExisting(null);
-    setEx({ number: 1, topic: "", files: [] });
-    setOpen(l.id);
-    router.replace(`/classes?open=${l.id}`);
-  }
-
   useEffect(() => {
     setOpen(params.get("open"));
   }, [params]);
@@ -270,7 +267,7 @@ export default function Classes() {
                       updateLessons((cur) => cur.filter((l) => l.courseId !== c.id));
                       updateCourses((cur) => cur.filter((x) => x.id !== c.id));
                     }}>Delete</button>
-                    <button className="btn sm" onClick={() => { setExisting(existing === c.id ? null : c.id); setEx({ number: Math.max(0, ...ls.map((l) => l.number)) + 1, topic: "", files: [] }); }}>+ existing class</button>
+                    <button className="btn sm" onClick={() => setExisting(existing === c.id ? null : c.id)} title="Bring in classes you’ve already taught: a Google Drive folder (as a zip), a folder or files from your computer">import classes</button>
                     <Link className="btn sm" href={`/prep?new=1&course=${c.id}`}>+ new class</Link>
                     <button className="btn sm" onClick={() => setPlanFor(planFor === c.id ? null : c.id)}>plan the semester</button>
                   </>
@@ -278,25 +275,7 @@ export default function Classes() {
               </div>
             </div>
             {planFor === c.id && <Planner course={c} close={() => setPlanFor(null)} />}
-            {existing === c.id && (
-              <form className="existing" onSubmit={(e) => { e.preventDefault(); if (ex.files.length) addExisting(c.id); }}>
-                <p className="mute" style={{ margin: 0 }}>Bring in a class you’ve already taught. PowerPoint slides come in as editable slides (with speaker notes and pictures); PDFs and Word files are kept as class materials.</p>
-                <div className="row" style={{ alignItems: "end" }}>
-                  <div style={{ width: 90 }}><label className="label">class #</label><input className="input" type="number" min={1} value={ex.number} onChange={(e) => setEx({ ...ex, number: Number(e.target.value) || 1 })} /></div>
-                  <div className="grow"><label className="label">topic (or leave blank to use the first slide’s title)</label><input className="input" value={ex.topic} onChange={(e) => setEx({ ...ex, topic: e.target.value })} /></div>
-                </div>
-                <label className="drop drop-file" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); setEx({ ...ex, files: [...ex.files, ...Array.from(e.dataTransfer.files)] }); }}>
-                  <input type="file" multiple accept={ACCEPT} className="hide" onChange={(e) => setEx({ ...ex, files: [...ex.files, ...Array.from(e.target.files ?? [])] })} />
-                  {ex.files.length ? ex.files.map((f) => f.name).join(" · ") : "Drop your files here — PowerPoint (.pptx), PDF, Word (.docx), images — or click to choose"}
-                </label>
-                {progress && <Working what="Bringing in your class" doing={progress} usual="a few seconds per file" />}
-                {exErr && <div className="err">{exErr}</div>}
-                <div className="row">
-                  <button className="btn solid" disabled={!ex.files.length || !!progress}>{progress || "add class"}</button>
-                  <button type="button" className="btn ghost" onClick={() => setExisting(null)}>cancel</button>
-                </div>
-              </form>
-            )}
+            {existing === c.id && <FolderImport course={c} close={() => setExisting(null)} />}
             {ls.length ? (
               <div className="classrows">
                 {ls.map((l) => (

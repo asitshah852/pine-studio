@@ -5,9 +5,17 @@ import { denied, passcodeOk } from "@/lib/auth";
 import { blobAuth, blobOn } from "@/lib/blob";
 
 const ok = (p: string | null): p is string => !!p && /^textbooks\/[\w.\- ()]+\.pdf$/i.test(p);
+// Slide pictures from her imported decks (random names nobody can guess).
+const img = (p: string | null): p is string => !!p && /^images\/[\w.-]+\.(jpg|png|webp|gif)$/i.test(p);
+const TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif" };
 
 export async function GET(req: Request) {
   const path = new URL(req.url).searchParams.get("path");
+  if (img(path) && blobOn()) {
+    const r = await get(path, { access: "private", ...blobAuth() });
+    if (!r || r.statusCode !== 200) return new Response("not found", { status: 404 });
+    return new Response(r.stream, { headers: { "Content-Type": TYPES[path.split(".").pop()!.toLowerCase()] ?? "image/jpeg", "Cache-Control": "private, max-age=31536000, immutable" } });
+  }
   if (!ok(path) || !blobOn()) return new Response("not found", { status: 404 });
   const r = await get(path, { access: "private", ...blobAuth() });
   if (!r || r.statusCode !== 200) return new Response("not found", { status: 404 });

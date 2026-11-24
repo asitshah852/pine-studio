@@ -7,7 +7,7 @@ import { db, dbConfigured, K } from "./db";
 export type JobRecord = { status: "running" | "done" | "failed"; started: string; finished?: string; data?: unknown; error?: string; meta?: unknown };
 const TTL = 7 * 86400;
 const key = (k: string) => K(`result:${k}`);
-export const validKey = (k: unknown): k is string => typeof k === "string" && /^(research|slides|review|check|chat|pdf|quiz|plan|planchat):[\w-]{1,64}$/.test(k);
+export const validKey = (k: unknown): k is string => typeof k === "string" && /^(research|slides|review|check|chat|pdf|quiz|plan|planchat|talk):[\w-]{1,64}$/.test(k);
 
 /** Run a job and keep its outcome; without the shared database it just runs. */
 export async function keep<T>(jobKey: unknown, meta: unknown, fn: () => Promise<T>): Promise<T> {

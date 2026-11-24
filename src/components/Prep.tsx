@@ -7,7 +7,7 @@ import { load, proxied, save, uid, useCollection, useStatus } from "@/lib/client
 import { downloadDocx } from "@/lib/docx";
 import { MIME, readDrag, startDrag } from "@/lib/drag";
 import { recover, runJob, useJob } from "@/lib/jobs";
-import { makeClass, runCheck, runResearch, runRestyle, runSlides, slideCount } from "@/lib/make";
+import { makeClass, runCheck, runResearch, runRestyle, runSlides, runTalking, slideCount } from "@/lib/make";
 import { oneGate, stopMaking, Stopped } from "@/lib/makeQueue";
 import { applyFix, confirmClaim, restore, withChat, withCheck, withResearch, withReview, withSlides } from "@/lib/lessonOps";
 import { caption } from "@/lib/museum";
@@ -294,6 +294,7 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
     return () => window.removeEventListener("pine:goto-slide", go);
   }, []);
   const checkJob = useJob(`check:${lesson.id}`);
+  const talkJob = useJob(`talk:${lesson.id}`);
   const takeFix = (slideId: string, i: number) => {
     const next = applyFix(lesson, slideId, i);
     if (next) set(() => next);
@@ -392,6 +393,11 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
         </>
       ) : <span className="mute" style={{ fontSize: 16 }}>No notes yet — write them first, or start with a blank slide.</span>}
       <button className="btn ghost" onClick={() => { const s = blankSlide("text"); setSlides((x) => [...x, s]); setSel(s.id); }}>+ blank slide</button>
+      {lesson.slides.some((x) => !x.notes.trim()) && (
+        <button className="btn ghost" disabled={talkJob.running || st?.claude === false} onClick={() => talkJob.run(async () => { await runTalking(lesson, set); })}>
+          {talkJob.running ? "writing talking points…" : `write talking points for ${lesson.slides.filter((x) => !x.notes.trim()).length} slide(s) without them`}
+        </button>
+      )}
       <Versions lesson={lesson} kind="slides" set={set} />
     </div>
   );
@@ -476,6 +482,12 @@ function SlidesStep({ lesson, course, set, resources, initial, onStep }: { lesso
                 <label className="label mono">talking points — what you’ll say while this slide is up (not shown on the slide)</label>
                 <textarea className="area talkpts" rows={4} value={slide.notes} onChange={(e) => edit({ notes: e.target.value })}
                   placeholder="A way in from the last slide, the context students need, a question to ask, how this connects to the next idea…" />
+                {!slide.notes.trim() && (
+                  talkJob.running
+                    ? <div className="mute" style={{ marginTop: 6 }}><span className="spinner tiny" aria-hidden="true" /> writing talking points…</div>
+                    : <button className="linkish" style={{ marginTop: 6 }} disabled={st?.claude === false} onClick={() => talkJob.run(async () => { await runTalking(lesson, set, [slide.id]); })}>suggest talking points</button>
+                )}
+                {talkJob.error && <div className="err">{talkJob.error}</div>}
               </div>
               {slide.check && slide.check.claims.length > 0 && (
                 <Claims claims={slide.check.claims} onConfirm={(ci, ok) => set((l) => confirmClaim(l, slide.id, ci, ok))} onUseFix={(ci) => takeFix(slide.id, ci)} />
@@ -733,6 +745,7 @@ export default function Prep() {
     recover(`research:${id}`, (d) => upd((l) => withResearch(l, d as ResearchDoc)));
     recover(`slides:${id}`, (d) => upd((l) => withSlides(l, Array.isArray(d) ? (d as Slide[]) : (d as { slides: Slide[] }).slides)));
     recover(`review:${id}`, (d) => upd((l) => withReview(l, d as ReviewDoc)));
+    recover(`talk:${id}`, (d) => { const got = new Map(((d as { slides: { id: string; talking: string }[] }).slides ?? []).map((x) => [x.id, x.talking])); upd((l) => ({ ...l, slides: l.slides.map((x) => (got.has(x.id) && !x.notes.trim() ? { ...x, notes: got.get(x.id)! } : x)) })); });
     recover(`chat:${id}`, (d) => upd((l) => withChat(l, undefined, d as { reply: string; sources: Source[]; ops: ChatOp[] })));
     recover(`check:${id}`, (d, m) => upd((l) => withCheck(l, d as { claims: Claim[]; at: string }, ((d as { checked?: string[] }).checked ?? (m as { ids?: string[] } | null)?.ids ?? []).filter(Boolean))));
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -97,3 +97,18 @@ export async function runRestyle(l: Lesson, course: string, set: Set): Promise<v
   set((x) => withResearch(x, r));
   forget(key);
 }
+
+/** Draft talking points for slides that have none (or just the given ones). Never overwrites a slide
+ *  whose talking points were typed in the meantime. */
+export async function runTalking(l: Lesson, set: Set, only?: string[]): Promise<number> {
+  const want = (only ?? l.slides.filter((s) => !s.notes.trim()).map((s) => s.id)).filter((id) => l.slides.some((s) => s.id === id));
+  if (!want.length) return 0;
+  const key = `talk:${l.id}`;
+  const notes = (l.research?.sections ?? []).flatMap((s) => s.paragraphs.map((p) => p.text));
+  const slides = l.slides.map((s) => ({ id: s.id, title: s.title, text: plainBody(s.body), caption: s.artworks.map((a) => caption(a)).join("; ") || s.images.map((i) => i.credit).join("; "), talking: s.notes }));
+  const r = await apiJob<{ slides: { id: string; talking: string }[] }>("/api/talk", { topic: l.topic, course: "", notes, slides, want, jobKey: key });
+  const got = new Map(r.slides.map((x) => [x.id, x.talking]));
+  set((x) => ({ ...x, slides: x.slides.map((s) => (got.has(s.id) && !s.notes.trim() ? { ...s, notes: got.get(s.id)! } : s)) }));
+  forget(key);
+  return got.size;
+}

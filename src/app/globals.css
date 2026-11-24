@@ -729,3 +729,9 @@ body.slidesfocus .page { max-width: none; padding-left: 28px; }
 .checkline { margin-left: auto; align-self: center; font-size: 17px; }
 .checkline .bad, .v.bad { color: var(--safelight); }
 .slidemore > summary { font-size: 17px; color: var(--mute); }
+/* import classes */
+.folderimport { display: flex; flex-direction: column; gap: 12px; }
+.importlist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; max-height: 520px; overflow: auto; }
+.importlist li { display: flex; gap: 10px; align-items: flex-start; }
+.importlist li.off { opacity: 0.5; }
+.importlist input[type="checkbox"] { margin-top: 8px; }

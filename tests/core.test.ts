@@ -284,3 +284,26 @@ test("house-style rewrite: wording may change, facts may not", async () => {
   assert.ok(!keepsFacts(before, "MTV went on the air on August 1, 1981, a project of Robert Pittman, with the Buggles."), "a new name is caught");
   assert.ok(keepsFacts("Over 2,000 episodes aired.", "More than 2000 episodes aired."));
 });
+
+test("folder import: one class per presentation, handouts go with their deck", async () => {
+  const { group, cleanTitle, problem } = await import("../src/lib/folderImport");
+  assert.equal(cleanTitle("Week 03 - Impressionism_and the camera.pptx"), "Impressionism and the camera");
+  assert.equal(cleanTitle("2. Color theory.pptx"), "Color theory");
+  assert.equal(cleanTitle("Lecture 10: Photography.pdf"), "Photography");
+  const e = [
+    { name: "Week 10 - Photography.pptx", folder: "" },
+    { name: "Week 2 - Line and shape.pptx", folder: "" },
+    { name: "Line and shape handout.pdf", folder: "" },
+    { name: "Syllabus.docx", folder: "" },
+    { name: "Impressionism.pptx", folder: "Week 5" },
+    { name: "reading.pdf", folder: "Week 5" },
+    { name: "old.ppt", folder: "" },
+  ];
+  const g = group(e);
+  assert.deepEqual(g.map((p) => p.title), ["Syllabus", "Line and shape", "Photography", "Impressionism"]);
+  const line = g.find((p) => p.title === "Line and shape")!;
+  assert.deepEqual(line.files.map((i) => e[i].name), ["Week 2 - Line and shape.pptx", "Line and shape handout.pdf"]);
+  assert.deepEqual(g.find((p) => p.title === "Impressionism")!.files.map((i) => e[i].name), ["Impressionism.pptx", "reading.pdf"]);
+  assert.equal(g.find((p) => p.title === "Syllabus")!.use, false, "a handout on its own isn't ticked");
+  assert.match(problem("old.ppt")!, /pptx/);
+});

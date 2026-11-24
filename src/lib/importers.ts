@@ -68,6 +68,9 @@ export async function importPptx(file: File, onProgress?: (s: string) => void): 
         if (type === "ctrTitle") isTitleSlide = true;
       } else if (type !== "sldNum" && type !== "dt" && type !== "ftr") body.push(...lines);
     }
+    // No title placeholder (common in Google Slides decks built from plain text boxes): the first
+    // line of text is the title.
+    if (!title && body.length) title = body.shift()!;
     // speaker notes
     let notes = "";
     for (const v of r.values()) {
