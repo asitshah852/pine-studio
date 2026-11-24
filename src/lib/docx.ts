@@ -104,7 +104,7 @@ export async function downloadDocx(lesson: Lesson, course: string) {
 
   const blob = await Packer.toBlob(
     new Document({
-      creator: "pine studio",
+      creator: "pine kitchen",
       title: lesson.topic,
       styles: { default: { document: { run: { font: SERIF, size: 22 } } } },
       sections: [{ properties: { page: { margin: { top: 1300, bottom: 1300, left: 1500, right: 1500 } } }, children: kids }],
@@ -150,7 +150,7 @@ export async function downloadQuiz(lesson: Lesson, course: string) {
     kids.push(p(`${i + 1}. ${k >= 0 ? `${L[k]})  ` : ""}${q.answer}`, { before: 160 }));
     kids.push(p(`from ${q.from}`, { italics: true, color: "777777", size: 18 }));
   });
-  const blob = await Packer.toBlob(new Document({ creator: "pine studio", title: `${lesson.topic} quiz`, sections: [{ children: kids }] }));
+  const blob = await Packer.toBlob(new Document({ creator: "pine kitchen", title: `${lesson.topic} quiz`, sections: [{ children: kids }] }));
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `Class ${String(lesson.number).padStart(2, "0")} - ${lesson.topic} - quiz`.replace(/[^\w\s-]/g, "").slice(0, 90) + ".docx";

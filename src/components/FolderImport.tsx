@@ -1,7 +1,7 @@
 "use client";
 // Import classes she has already taught: a zip downloaded from Google Drive, a whole folder from her
 // computer, or a few files. Each presentation becomes a ready class (her slides and speaker notes as
-// they are, in pine studio's look); handouts in the same folder come along as class materials.
+// they are, in pine kitchen's look); handouts in the same folder come along as class materials.
 // She sees the list first, edits titles, unticks anything, then imports.
 import { useRef, useState } from "react";
 import { load, uid, useStatus } from "@/lib/client";
@@ -126,7 +126,7 @@ export default function FolderImport({ course, close }: { course: Course; close:
       )}
       {done && (
         <div className="stack">
-          <p style={{ margin: 0 }}>✓ {done.made} class{done.made === 1 ? "" : "es"} imported as ready.{talk && done.made ? " Talking points are being drafted in the background — keep a pine studio page open for a few minutes." : ""}</p>
+          <p style={{ margin: 0 }}>✓ {done.made} class{done.made === 1 ? "" : "es"} imported as ready.{talk && done.made ? " Talking points are being drafted in the background — keep a pine kitchen page open for a few minutes." : ""}</p>
           {done.errors.length > 0 && <details className="srcs"><summary className="mute">{done.errors.length} problem{done.errors.length === 1 ? "" : "s"}</summary><ul>{done.errors.map((x, i) => <li key={i}>{x}</li>)}</ul></details>}
           <div><button className="btn" onClick={close}>done</button></div>
         </div>

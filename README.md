@@ -1,4 +1,4 @@
-# pine studio
+# pine kitchen (formerly pine studio)
 
 > **Nov 2026:** simplified — menu is home · classes · library (+ more: checker, feedback, clip button). A class opens in its workspace (two tabs: notes · slides, "ready for class →") until it is finished, then on its class page. See CLAUDE.md "Simplified".
 

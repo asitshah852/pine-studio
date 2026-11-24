@@ -142,7 +142,7 @@ function ResearchStep({ lesson, course, set, onNext }: { lesson: Lesson; course:
   if (!doc)
     return (
       <div className="stack" style={{ maxWidth: 720 }}>
-        <p style={{ margin: 0 }}>No notes yet. pine studio writes 1–2 pages from your textbooks and trusted museum and scholarly pages, with a source for every fact, discussion questions, and pictures and videos to show.</p>
+        <p style={{ margin: 0 }}>No notes yet. pine kitchen writes 1–2 pages from your textbooks and trusted museum and scholarly pages, with a source for every fact, discussion questions, and pictures and videos to show.</p>
         <div className="row">
           <button className="btn solid" disabled={busy || st?.claude === false} onClick={run}>{busy ? "writing…" : "write the notes"}</button>
           <button className="linkish" onClick={onNext}>skip — I’ll make slides by hand</button>

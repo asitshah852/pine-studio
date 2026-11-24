@@ -247,7 +247,7 @@ export default function Planner({ course, close }: { course: Course; close: () =
             <button className="btn solid" disabled={!ticked.length || st?.claude === false} onClick={() => add(true)}>add & make them</button>
             {unmade.length > 0 && <button className="linkish" disabled={!ticked.length || q.running} onClick={() => add(false, true)} title={q.running ? "Stop making classes first" : ""}>replace my {unmade.length} unmade class{unmade.length === 1 ? "" : "es"} with these</button>}
           </div>
-          <span className="mute small">“make” builds each class in turn (about 4–6 minutes each) while a pine studio page stays open; pause or stop at any time.</span>
+          <span className="mute small">“make” builds each class in turn (about 4–6 minutes each) while a pine kitchen page stays open; pause or stop at any time.</span>
         </>
       )}
       <QueueControls courseId={course.id} />

@@ -10,7 +10,7 @@ import { background } from "@/lib/results";
 
 export const maxDuration = 300;
 const MAX = 300 * 1024 * 1024;
-const UA = { "User-Agent": "PineStudio/0.1 (teaching tool)" };
+const UA = { "User-Agent": "PineKitchen/0.1 (teaching tool)" };
 
 const isPdf = (r: Response) => {
   const type = r.headers.get("content-type") ?? "";

@@ -3,7 +3,7 @@
 // and every artwork links to its museum page. Images are only offered for public-domain works.
 import type { Artwork } from "./types";
 
-const UA = { "User-Agent": "PineStudio/0.1 (teaching tool)", "AIC-User-Agent": "PineStudio/0.1 (teaching tool)" };
+const UA = { "User-Agent": "PineKitchen/0.1 (teaching tool)", "AIC-User-Agent": "PineKitchen/0.1 (teaching tool)" };
 
 const clean = (s: unknown) => (typeof s === "string" ? s.replace(/\s+/g, " ").trim() : "");
 

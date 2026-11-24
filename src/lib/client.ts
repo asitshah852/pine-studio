@@ -50,7 +50,7 @@ export async function api<T>(url: string, init: RequestInit = {}): Promise<T> {
   const j = (await res.json().catch(() => ({}))) as { error?: string };
   if (res.status === 401) {
     window.dispatchEvent(new Event("pine:need-passcode"));
-    throw new Error(j.error ?? "Studio passcode needed.");
+    throw new Error(j.error ?? "Passcode needed.");
   }
   if (!res.ok) throw new Error(j.error ?? `Something went wrong (${res.status}).`);
   return j as T;

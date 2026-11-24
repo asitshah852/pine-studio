@@ -12,4 +12,4 @@ export function passcodeOk(req: Request): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export const denied = () => Response.json({ error: "Studio passcode needed." }, { status: 401 });
+export const denied = () => Response.json({ error: "Passcode needed." }, { status: 401 });

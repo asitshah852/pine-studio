@@ -61,7 +61,7 @@ export async function downloadPptx(lesson: Lesson) {
   const p = new PptxGenJS();
   p.layout = "LAYOUT_WIDE";
   p.title = `Class ${lesson.number}: ${lesson.topic}`;
-  p.author = "Pine Studio";
+  p.author = "Pine Kitchen";
 
   for (const s of lesson.slides) {
     const sl = p.addSlide();

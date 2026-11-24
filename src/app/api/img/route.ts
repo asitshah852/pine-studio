@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     return new Response("bad url", { status: 400 });
   }
   if (u.protocol !== "https:" || !IMAGE_HOSTS.includes(u.hostname)) return new Response("host not allowed", { status: 403 });
-  const r = await fetch(u, { headers: { "User-Agent": "PineStudio/0.1 (teaching tool)" } });
+  const r = await fetch(u, { headers: { "User-Agent": "PineKitchen/0.1 (teaching tool)" } });
   if (!r.ok) return new Response("image not found", { status: 502 });
   return new Response(r.body, {
     headers: { "Content-Type": r.headers.get("content-type") ?? "image/jpeg", "Cache-Control": "public, max-age=86400" },

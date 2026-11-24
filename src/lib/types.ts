@@ -1,4 +1,4 @@
-// Shared shapes for Pine Studio. Everything factual carries its sources.
+// Shared shapes for Pine Kitchen. Everything factual carries its sources.
 
 export type Source = { title: string; url: string; note?: string };
 

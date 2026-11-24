@@ -1,6 +1,6 @@
 "use client";
 // PDF saving queue: click "save" on as many books as you like; two are saved at a time, and the
-// queue keeps going while she moves around pine studio (the tab just has to stay open).
+// queue keeps going while she moves around pine kitchen (the tab just has to stay open).
 import { useEffect, useState } from "react";
 import { load, save, waitResult } from "./client";
 import { saveFromLink, uploadTextbook } from "./textbooks";

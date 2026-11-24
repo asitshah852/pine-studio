@@ -6,7 +6,7 @@
 import { isMatch } from "./museum";
 import type { Artwork } from "./types";
 
-const UA = { "User-Agent": "PineStudio/0.1 (teaching tool)" };
+const UA = { "User-Agent": "PineKitchen/0.1 (teaching tool)" };
 const clean = (s: unknown) => (typeof s === "string" ? s.replace(/\s+/g, " ").trim() : "");
 const first = (v: unknown) => (Array.isArray(v) ? clean(v[0]) : clean(v));
 const https = (u: string) => (u.startsWith("//") ? `https:${u}` : u).replace(/#.*$/, "");

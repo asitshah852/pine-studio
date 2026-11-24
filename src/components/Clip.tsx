@@ -88,8 +88,8 @@ export default function Clip({ setup = false }: { setup?: boolean }) {
         <p>Send any museum page, article or YouTube video to a class with one click, from any website.</p>
         <ol className="steps-list">
           <li>Show your bookmarks bar: in Chrome or Edge press <b>⌘ Shift B</b> (Mac) or <b>Ctrl Shift B</b> (Windows); in Safari choose View → Show Favorites Bar.</li>
-          <li>Drag this button up onto the bookmarks bar: {bookmarklet && <a className="clipbtn" href={bookmarklet} onClick={(e) => { e.preventDefault(); alert("Drag this button onto your bookmarks bar (don’t click it here)."); }}>＋ pine studio</a>}</li>
-          <li>On any page, click <b>＋ pine studio</b> in the bookmarks bar. A small window opens: pick the class and send it. Highlight a passage first to keep that passage too.</li>
+          <li>Drag this button up onto the bookmarks bar: {bookmarklet && <a className="clipbtn" href={bookmarklet} onClick={(e) => { e.preventDefault(); alert("Drag this button onto your bookmarks bar (don’t click it here)."); }}>＋ pine kitchen</a>}</li>
+          <li>On any page, click <b>＋ pine kitchen</b> in the bookmarks bar. A small window opens: pick the class and send it. Highlight a passage first to keep that passage too.</li>
         </ol>
         <p className="mute">What happens to a clip: a museum object page (Art Institute of Chicago, The Met, Cleveland) or a YouTube video becomes a picture or video for the class, with the caption taken from the museum’s own record. Any other page is kept as a source the notes for that class read and cite, or saved to your Library.</p>
       </main>
@@ -97,7 +97,7 @@ export default function Clip({ setup = false }: { setup?: boolean }) {
 
   return (
     <main className="clip">
-      <div className="mark">pine studio</div>
+      <div className="mark">pine kitchen</div>
       {done ? (
         <p className="clipdone">✓ {done}</p>
       ) : (

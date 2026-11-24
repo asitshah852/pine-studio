@@ -17,7 +17,7 @@ const TABS = [
 // Less-used pages, folded under "more".
 const MORE = [
   ["/checker", "checker", "check any text, screenshot or PDF for facts"],
-  ["/feedback", "feedback", "ask for a change to pine studio"],
+  ["/feedback", "feedback", "ask for a change to pine kitchen"],
   ["/clipper", "clip button", "send any web page to a class from your bookmarks bar"],
 ] as const;
 
@@ -55,7 +55,7 @@ export default function Nav() {
   if (/^\/(handout|present|show|clip|quiz)(\/|$)/.test(path)) return null; // pages that stand on their own
   return (
     <aside className="side">
-      <Link href="/" className="mark">pine studio</Link>
+      <Link href="/" className="mark">pine kitchen</Link>
       <nav aria-label="Sections">
         {TABS.map(([href, label]) => (
           <div key={href}>
@@ -122,7 +122,7 @@ export default function Nav() {
             location.reload();
           }}
         >
-          <label>studio passcode</label>
+          <label>kitchen passcode</label>
           <input className="input" type="password" value={pass} onChange={(e) => setP(e.target.value)} autoFocus />
           <button className="btn solid sm">unlock</button>
         </form>

@@ -67,7 +67,7 @@ export const STARTER_RESOURCES: Resource[] = [
     title: "Art Institute of Chicago — collection, open-access images & API",
     url: "https://www.artic.edu/collection",
     topics: ["Chicago", "images", "exhibits"],
-    notes: "Public-domain images are free to use (Pine Studio's Exhibits search uses this). Free online scholarly catalogues (Monet, Renoir, Manet, Pissarro, Whistler…) at artic.edu/digital-publications.",
+    notes: "Public-domain images are free to use (Pine Kitchen's picture search uses this). Free online scholarly catalogues (Monet, Renoir, Manet, Pissarro, Whistler…) at artic.edu/digital-publications.",
   }),
   r({
     kind: "museum",
@@ -75,14 +75,14 @@ export const STARTER_RESOURCES: Resource[] = [
     publisher: "The Metropolitan Museum of Art",
     url: "https://www.metmuseum.org/art/collection/search",
     topics: ["images", "exhibits"],
-    notes: "Public-domain images and data free to use (CC0). Pine Studio's Exhibits search uses The Met's open API.",
+    notes: "Public-domain images and data free to use (CC0). Pine Kitchen's picture search uses The Met's open API.",
   }),
   r({
     kind: "museum",
     title: "Cleveland Museum of Art — open access collection",
     url: "https://www.clevelandart.org/open-access",
     topics: ["images", "exhibits"],
-    notes: "About 30,000 public-domain images free to use (CC0). Pine Studio's Exhibits search uses Cleveland's open API.",
+    notes: "About 30,000 public-domain images free to use (CC0). Pine Kitchen's picture search uses Cleveland's open API.",
   }),
   r({
     kind: "museum",
@@ -178,7 +178,7 @@ export function findLinks(title: string, author = ""): { label: string; url: str
 export const STARTER_ADDITIONS = STARTER_RESOURCES.filter((r) => /metmuseum\.org\/art\/collection|clevelandart\.org\/open-access/.test(r.url ?? ""));
 
 const SEARCHED = /(^|\.)(artic\.edu|metmuseum\.org|clevelandart\.org|loc\.gov)$/;
-/** How pine studio uses a Library entry (shown as a small label). */
+/** How pine kitchen uses a Library entry (shown as a small label). */
 export function usage(r: { url?: string; kind: string; pdf?: unknown }): "searched" | "research" | "copy" | "link" {
   if (r.pdf) return "copy";
   let host = "";

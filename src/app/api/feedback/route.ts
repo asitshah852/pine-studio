@@ -12,9 +12,9 @@ export async function POST(req: Request) {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: process.env.FEEDBACK_EMAIL_FROM || "Pine Studio <onboarding@resend.dev>",
+      from: process.env.FEEDBACK_EMAIL_FROM || "Pine Kitchen <onboarding@resend.dev>",
       to,
-      subject: `Pine Studio feedback (${tab}): ${text.replace(/\s+/g, " ").slice(0, 60)}`,
+      subject: `Pine Kitchen feedback (${tab}): ${text.replace(/\s+/g, " ").slice(0, 60)}`,
       text: `Feedback on the ${tab} tab:\n\n${text}\n\nTo make the change, paste this into a Claude Code session.`,
     }),
   });

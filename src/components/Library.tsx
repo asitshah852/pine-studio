@@ -195,7 +195,7 @@ export default function Library() {
                 {r.pdf && (
                   <div className="pdfline">
                     <a href={pdfUrl(r.pdf.path)} target="_blank" rel="noreferrer">open your PDF ↗</a>
-                    {(r.kind === "textbook" && (r.pdf.pages ?? 999) < 40) && <span className="err-inline">only {r.pdf.pages} pages — this may be a sample, not the whole book; try “add a PDF” with the full book’s link · </span>}<span className="mute">{r.pdf.pages ? `${r.pdf.pages} pages · ` : ""}{r.pdf.size < 1e5 ? `${Math.max(1, Math.round(r.pdf.size / 1e3))} KB` : `${(r.pdf.size / 1e6).toFixed(1)} MB`}{r.pdf.textId ? "" : " · scanned, so pine studio can’t read it"}</span>
+                    {(r.kind === "textbook" && (r.pdf.pages ?? 999) < 40) && <span className="err-inline">only {r.pdf.pages} pages — this may be a sample, not the whole book; try “add a PDF” with the full book’s link · </span>}<span className="mute">{r.pdf.pages ? `${r.pdf.pages} pages · ` : ""}{r.pdf.size < 1e5 ? `${Math.max(1, Math.round(r.pdf.size / 1e3))} KB` : `${(r.pdf.size / 1e6).toFixed(1)} MB`}{r.pdf.textId ? "" : " · scanned, so pine kitchen can’t read it"}</span>
                   </div>
                 )}
                 {pq.status.get(r.id) && (
@@ -220,7 +220,7 @@ export default function Library() {
                     ) : (
                       <>
                         <div className="row" style={{ alignItems: "end" }}>
-                          <div className="grow"><label className="label">the book’s web page or its PDF link — pine studio finds the PDF</label><input className="input" placeholder="https://" value={pdfLink} onChange={(e) => { setPdfLink(e.target.value); setPdfFile(null); }} /></div>
+                          <div className="grow"><label className="label">the book’s web page or its PDF link — pine kitchen finds the PDF</label><input className="input" placeholder="https://" value={pdfLink} onChange={(e) => { setPdfLink(e.target.value); setPdfFile(null); }} /></div>
                           {st?.pdfUploads !== false && (
                             <>
                               <span className="mute">or</span>

@@ -4,8 +4,8 @@ import Nav from "@/components/Nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "pine studio",
-  description: "Teaching studio for Art Appreciation: library, classes, lesson prep, fact-checking.",
+  title: "pine kitchen",
+  description: "Where Tanya cooks her classes: notes, slides, presenting and fact-checking.",
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
